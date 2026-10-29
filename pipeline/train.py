@@ -162,21 +162,24 @@ def main():
     ap.add_argument("--features", type=Path, default=ROOT / "data" / "processed" / "features.parquet")
     ap.add_argument("--reports", type=Path, default=ROOT / "reports")
     ap.add_argument("--models", type=Path, default=ROOT / "models")
+    ap.add_argument("--no-cv", action="store_true",
+                    help="skip validation and only train the final model (e.g. before 3 days of data exist)")
     args = ap.parse_args()
     args.reports.mkdir(parents=True, exist_ok=True)
     args.models.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_parquet(args.features)
-    print("cross-validation (one fold per test day):")
-    folds, by_hour = cross_validate(df)
-    summary = summarise(folds)
+    if not args.no_cv:
+        print("cross-validation (one fold per test day):")
+        folds, by_hour = cross_validate(df)
+        summary = summarise(folds)
 
-    folds.to_csv(args.reports / "cv_folds.csv", index=False)
-    by_hour.to_csv(args.reports / "cv_by_hour.csv")
-    (args.reports / "cv_summary.json").write_text(json.dumps(summary, indent=2))
+        folds.to_csv(args.reports / "cv_folds.csv", index=False)
+        by_hour.to_csv(args.reports / "cv_by_hour.csv")
+        (args.reports / "cv_summary.json").write_text(json.dumps(summary, indent=2))
 
-    print("\naverage over folds:")
-    print(pd.DataFrame(summary).T.round(3).to_string())
+        print("\naverage over folds:")
+        print(pd.DataFrame(summary).T.round(3).to_string())
 
     # final model on everything, for the app and the driver analysis
     full = df[df["y"].notna() & df["bikes_now"].notna()]

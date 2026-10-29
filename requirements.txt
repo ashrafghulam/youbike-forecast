@@ -6,4 +6,7 @@ scikit-learn>=1.4
 lightgbm>=4.3
 shap>=0.45
 matplotlib>=3.8
+streamlit>=1.40
+pydeck>=0.9
+altair>=5
 pytest>=8

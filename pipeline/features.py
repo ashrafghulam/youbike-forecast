@@ -101,7 +101,9 @@ def weather_features(slots: pd.DatetimeIndex, points, obs: pd.DataFrame, fc: pd.
     return grid[keep]
 
 
-def build_features(processed: Path) -> pd.DataFrame:
+def build_features(processed: Path, output_slots=None) -> pd.DataFrame:
+    """Feature table for every slot, or only for `output_slots` (used by the live app).
+    History before those slots is still used for lags; only the output is limited."""
     snap = pd.read_parquet(processed / "snapshots.parquet")
     stations = pd.read_parquet(processed / "stations.parquet").set_index("station_id")
     obs = pd.read_parquet(processed / "weather.parquet")
@@ -140,7 +142,8 @@ def build_features(processed: Path) -> pd.DataFrame:
         "nbr_fill_now": nbr_fill,
         "nbr_chg_30m": nbr_fill - nbr_fill.shift(3),
     }
-    df = pd.concat([stack(m, k) for k, m in cols.items()], axis=1).reset_index()
+    out_slots = slots if output_slots is None else pd.DatetimeIndex(output_slots).intersection(slots)
+    df = pd.concat([stack(m.loc[out_slots], k) for k, m in cols.items()], axis=1).reset_index()
 
     # calendar, described at the target time (t + 60 min)
     target_time = df["slot"] + pd.Timedelta(minutes=60)
@@ -157,7 +160,7 @@ def build_features(processed: Path) -> pd.DataFrame:
     df = df.merge(st, on="station_id", how="left")
 
     # weather
-    wf = weather_features(slots, stations["weather_point"].unique(), obs, fc)
+    wf = weather_features(out_slots, stations["weather_point"].unique(), obs, fc)
     df = df.merge(wf, on=["slot", "weather_point"], how="left")
 
     df["date"] = df["slot"].dt.date
