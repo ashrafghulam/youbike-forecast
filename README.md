@@ -13,7 +13,11 @@ Predict how many bikes a Taipei / New Taipei YouBike station will have one hour 
 
 ## Collection pipeline
 
-GitHub Actions runs `collector/collect.py` every 10 minutes. Each run fetches:
+GitHub Actions takes a snapshot every 10 minutes with `collector/collect.py`.
+
+GitHub's scheduler is best effort (runs start late or get skipped, and a new schedule can take hours to begin), so the job doesn't depend on it for timing. Each run is a long job that loops for ~5.5 hours, taking a snapshot at every 10-minute mark and pushing it right away. Before it ends, it starts the next run itself; the hourly schedule is a second backup. The `concurrency` group keeps exactly one collector running, with the next one waiting in the queue.
+
+Each snapshot fetches:
 
 | Source | Endpoint | Notes |
 |---|---|---|
@@ -35,7 +39,8 @@ How it handles failures:
 - files are written to a temp name and then renamed, so there are no half-written files
 - every attempt, failed or not, is logged in the manifest, so gaps are measurable later
 - a run where any source failed shows red in the Actions tab, but whatever succeeded is still committed
-- runs never overlap (`concurrency` group), and pushes retry on conflict
+- only one collector runs at a time (`concurrency` group), and pushes retry on conflict
+- each snapshot is pushed as soon as it is taken, so a crashed job loses at most one snapshot
 
 Keeping the raw data untouched means the clean dataset can always be rebuilt from scratch, and a parsing bug never loses data.
 

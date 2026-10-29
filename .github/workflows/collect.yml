@@ -1,22 +1,30 @@
 name: collect
 
+# GitHub's scheduler is "best effort": runs can start late or be skipped, and
+# a new schedule can take hours to start. So each run is a long job that takes
+# a snapshot every 10 minutes by itself for ~5.5 hours. The schedule (and a
+# queued run waiting behind the current one) only has to start a new job
+# when the previous one ends, and as a backup every run starts the next one
+# itself before it finishes. To stop collecting: Actions tab -> collect ->
+# "..." -> Disable workflow.
+
 on:
   schedule:
-    - cron: "*/10 * * * *"   # every 10 minutes (GitHub may start a run a few minutes late)
-  workflow_dispatch:          # lets you run it by hand from the Actions tab
+    - cron: "17 * * * *"      # hourly; while a job is running, the next one waits in the queue
+  workflow_dispatch:          # start by hand from the Actions tab
 
-# Never run two collections at once; a late run waits instead of colliding.
 concurrency:
   group: collector
-  cancel-in-progress: false
+  cancel-in-progress: false   # never stop a running collector; the next run waits
 
 permissions:
   contents: write
+  actions: write              # lets a run start the next one
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 350      # GitHub's limit is 360
     steps:
       - uses: actions/checkout@v5
         with:
@@ -26,29 +34,28 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch snapshots
-        id: fetch
-        run: python collector/collect.py
-        continue-on-error: true   # still save what succeeded; status checked at the end
-
-      - name: Commit new data
-        if: always()
+      - name: Collect every 10 minutes for ~5.5 hours
         run: |
           git config user.name  "youbike-collector"
           git config user.email "actions@users.noreply.github.com"
-          git add data/
-          if git diff --cached --quiet; then
-            echo "nothing new to commit"; exit 0
-          fi
-          git commit -m "data: snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
-          for i in 1 2 3 4 5; do
-            git pull --rebase --quiet && git push --quiet && exit 0
-            echo "push failed, retry $i"; sleep $((i * 5))
+          end=$(( $(date +%s) + 330 * 60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            python collector/collect.py || echo "::warning::a source failed at $(date -u +%H:%M)Z (see manifest)"
+            git add data/
+            if ! git diff --cached --quiet; then
+              git commit -q -m "data: snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+              for i in 1 2 3 4 5; do
+                git pull -q --rebase && git push -q && break
+                echo "push failed, retry $i"; sleep $((i * 5))
+              done
+            fi
+            # sleep until the next 10-minute mark
+            now=$(date +%s)
+            sleep $(( 600 - now % 600 ))
           done
-          exit 1
 
-      - name: Mark run failed if any source failed
-        if: steps.fetch.outcome == 'failure'
-        run: |
-          echo "At least one source failed this run (see manifest)."
-          exit 1
+      - name: Start the next run (backup for a late scheduler)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run collect.yml --ref main -R "$GITHUB_REPOSITORY"
