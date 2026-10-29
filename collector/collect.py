@@ -39,19 +39,9 @@ NTPC_URL = "https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf00
 NTPC_PAGE_SIZE = 1000
 NTPC_MAX_PAGES = 20    # safety stop
 
-# Weather points: a coarse grid over Taipei + New Taipei urban area.
-# Open-Meteo accepts several coordinates in one call.
-WEATHER_POINTS = [
-    (25.033, 121.565),  # Xinyi / Taipei 101
-    (25.047, 121.517),  # Taipei Main Station
-    (25.080, 121.525),  # Shilin / Zhongshan north
-    (25.013, 121.535),  # Gongguan / NTU
-    (25.062, 121.600),  # Neihu / Songshan
-    (25.013, 121.465),  # Banqiao (New Taipei)
-    (25.060, 121.460),  # Sanchong / Xinzhuang (New Taipei)
-    (24.993, 121.510),  # Zhonghe / Yonghe (New Taipei)
-    (24.975, 121.540),  # Xindian (New Taipei)
-]
+# Weather points: one per ~10 km grid cell that contains YouBike stations
+# (placed at the stations' centre). Generated from the station list; see README.
+WEATHER_POINTS = json.loads((Path(__file__).resolve().parent / "weather_points.json").read_text())
 WEATHER_VARS = "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,cloud_cover"
 
 
@@ -121,8 +111,8 @@ def fetch_weather() -> tuple[bytes, int]:
     """Current conditions + next 3 hours of forecast for each grid point.
     The forecast is what a live system would actually know at prediction time."""
     params = {
-        "latitude": ",".join(str(p[0]) for p in WEATHER_POINTS),
-        "longitude": ",".join(str(p[1]) for p in WEATHER_POINTS),
+        "latitude": ",".join(str(p["lat"]) for p in WEATHER_POINTS),
+        "longitude": ",".join(str(p["lon"]) for p in WEATHER_POINTS),
         "current": WEATHER_VARS,
         "hourly": WEATHER_VARS + ",precipitation_probability",
         "forecast_hours": 3,
@@ -130,7 +120,12 @@ def fetch_weather() -> tuple[bytes, int]:
     }
     body = http_get("https://api.open-meteo.com/v1/forecast", params)
     data = json.loads(body)
-    return body, len(data) if isinstance(data, list) else 1
+    data = data if isinstance(data, list) else [data]
+    if len(data) != len(WEATHER_POINTS):
+        raise RuntimeError(f"expected {len(WEATHER_POINTS)} locations, got {len(data)}")
+    # keep the requested points with the response, so each file explains itself
+    wrapped = {"points": WEATHER_POINTS, "response": data}
+    return json.dumps(wrapped, ensure_ascii=False).encode("utf-8"), len(data)
 
 
 SOURCES = {
