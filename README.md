@@ -5,7 +5,7 @@ Predict how many bikes a Taipei / New Taipei YouBike station will have one hour 
 ## Status
 
 - [x] Collector running (from 30 Oct 2026)
-- [ ] Dataset build
+- [x] Dataset build (`pipeline/build_dataset.py`, documented in [docs/DATASET.md](docs/DATASET.md))
 - [ ] Baseline and model
 - [ ] Drivers and what-if scenarios
 - [ ] App and presentation
@@ -18,7 +18,7 @@ GitHub Actions runs `collector/collect.py` every 10 minutes. Each run fetches:
 |---|---|---|
 | `taipei` | YouBike Taipei live JSON | one list, all stations |
 | `ntpc` | New Taipei open data API | paged (`page`, `size=1000`), merged into one list |
-| `weather` | Open-Meteo forecast API | current conditions + next 3 h forecast at 9 points over the city |
+| `weather` | Open-Meteo forecast API | current conditions + next 3 h forecast at 24 points covering every station |
 
 Raw responses are saved unchanged, gzip-compressed:
 
@@ -38,7 +38,16 @@ How it handles failures:
 
 Keeping the raw data untouched means the clean dataset can always be rebuilt from scratch, and a parsing bug never loses data.
 
-## Run locally
+## Building the dataset
+
+```bash
+pip install -r requirements.txt
+python pipeline/build_dataset.py     # data/raw -> data/processed
+```
+
+See [docs/DATASET.md](docs/DATASET.md) for the tables, columns, cleaning rules and known issues.
+
+## Run the collector locally
 
 ```bash
 python collector/collect.py            # all sources

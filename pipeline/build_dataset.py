@@ -31,7 +31,7 @@ STALE_MINUTES = 30      # station reading older than this at fetch time is flagg
 # Weather grid used by the collector (one point per ~10 km cell with stations).
 WEATHER_GRID = json.loads((ROOT / "collector" / "weather_points.json").read_text())
 
-# The first files (30 Oct 2026, before ~03:30) used 9 fixed points and stored
+# The first file (30 Oct 2026, 02:49 Taipei) used 9 fixed points and stored
 # only the raw response; these are their names, in request order.
 LEGACY_POINTS = [
     ("xinyi", 25.033, 121.565),
