@@ -1,4 +1,4 @@
-pandas>=2.2
+pandas==2.2.3  # 3.x builds are blocked by Windows Smart App Control on some machines
 pyarrow>=15
 numpy>=1.26
 scipy>=1.11
