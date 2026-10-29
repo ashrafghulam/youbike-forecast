@@ -77,6 +77,24 @@ fold 2: train days 1-3        test day 4
 
 `reports/cv_by_hour.csv` breaks the error down by hour of day, because "same as now" is almost perfect at 3 AM and the real test is the rush hours.
 
+## Drivers and what-if scenarios
+
+`python pipeline/drivers.py` explains the final model in three ways. All numbers are in bikes, because the model predicts the change in bikes over the next hour.
+
+1. **Importance (SHAP).** For 30,000 random rows, SHAP splits each forecast into a contribution per input. The average size of these contributions shows what the model relies on. Inputs are also grouped (current state, recent trend, yesterday / last week, neighbours, time, location, weather). The group value is computed on the summed contributions per row, so related inputs that share credit aren't counted twice.
+   Output: `reports/driver_importance.csv`, `figures/importance_groups.png`, `figures/importance_features.png`.
+
+2. **How the forecast moves with one input (partial dependence).** Take real rows, set one input to a fixed value for all of them, and average the forecast. Repeat for each value. Done for the hour of day (weekday vs weekend), the rain forecast, and the neighbours' change over the last 30 minutes.
+   Output: `reports/partial_dependence.csv`, `figures/pd_hour.png`, `figures/pd_rain.png`, `figures/pd_neighbours.png`.
+
+3. **What-if scenarios.** Take every station at a real weekday evening moment (17:30, forecasting 18:30) and change one thing: heavy rain, no rain, Saturday instead of a weekday, neighbours emptying, the station itself draining, a 6 °C warmer evening. For each, count how many stations the model expects to be nearly empty and how much the forecasts move.
+   Output: `reports/whatif_scenarios.csv`.
+
+Limits of this analysis:
+- It explains what **the model** learned from ~9 days of autumn data, not proven cause and effect.
+- Changing one input alone can create combinations that never happen (heavy rain with no clouds). Scenarios stay close to real conditions to limit this.
+- With only a few rainy hours in the data, the rain effect is uncertain.
+
 ## Results
 
 To be filled in after the final run on the complete data (planned 8 Nov 2026).
