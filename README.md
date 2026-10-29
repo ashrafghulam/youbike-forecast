@@ -6,7 +6,7 @@ Predict how many bikes a Taipei / New Taipei YouBike station will have one hour 
 
 - [x] Collector running (from 30 Oct 2026)
 - [x] Dataset build (`pipeline/build_dataset.py`, documented in [docs/DATASET.md](docs/DATASET.md))
-- [ ] Baseline and model
+- [x] Baselines, model and time-based validation (`pipeline/features.py`, `pipeline/train.py`, [docs/MODEL.md](docs/MODEL.md)), results after the final run
 - [ ] Drivers and what-if scenarios
 - [ ] App and presentation
 
@@ -46,6 +46,16 @@ python pipeline/build_dataset.py     # data/raw -> data/processed
 ```
 
 See [docs/DATASET.md](docs/DATASET.md) for the tables, columns, cleaning rules and known issues.
+
+## Model
+
+```bash
+python pipeline/features.py      # features.parquet
+python pipeline/train.py         # validation reports + final model
+python -m pytest tests/          # checks that no future data leaks into features
+```
+
+See [docs/MODEL.md](docs/MODEL.md).
 
 ## Run the collector locally
 
