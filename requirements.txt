@@ -1,6 +1,8 @@
-pandas==2.2.3  # 3.x builds are blocked by Windows Smart App Control on some machines
+pandas==2.2.3; python_version < "3.13"   # newer builds are blocked by Windows Smart App Control on some laptops
+pandas>=2.3.3,<3; python_version >= "3.13"   # 2.2.3 has no wheels for new Python (e.g. Streamlit Cloud)
 pyarrow>=15
-numpy>=1.26,<2.3  # newer numpy prints deprecation warnings inside pandas 2.2
+numpy>=1.26,<2.3; python_version < "3.13"
+numpy>=2.3,<2.4; python_version >= "3.13"
 scipy>=1.11
 scikit-learn>=1.4
 lightgbm>=4.3
