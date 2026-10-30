@@ -241,3 +241,6 @@
 {"fetched_at_utc": "2026-10-30T13:20:00+00:00", "source": "taipei", "status": "ok", "records": 1824, "bytes": 955366, "file": "raw/taipei/2026-10-30/20261030T132000Z.json.gz", "seconds": 1.6}
 {"fetched_at_utc": "2026-10-30T13:20:01+00:00", "source": "ntpc", "status": "ok", "records": 1614, "bytes": 771190, "file": "raw/ntpc/2026-10-30/20261030T132001Z.json.gz", "seconds": 6.83}
 {"fetched_at_utc": "2026-10-30T13:20:08+00:00", "source": "weather", "status": "ok", "records": 24, "bytes": 34605, "file": "raw/weather/2026-10-30/20261030T132008Z.json.gz", "seconds": 0.41}
+{"fetched_at_utc": "2026-10-30T13:30:00+00:00", "source": "taipei", "status": "ok", "records": 1824, "bytes": 955348, "file": "raw/taipei/2026-10-30/20261030T133000Z.json.gz", "seconds": 1.6}
+{"fetched_at_utc": "2026-10-30T13:30:02+00:00", "source": "ntpc", "status": "ok", "records": 1614, "bytes": 771221, "file": "raw/ntpc/2026-10-30/20261030T133002Z.json.gz", "seconds": 8.66}
+{"fetched_at_utc": "2026-10-30T13:30:11+00:00", "source": "weather", "status": "ok", "records": 24, "bytes": 34595, "file": "raw/weather/2026-10-30/20261030T133011Z.json.gz", "seconds": 6.34}
