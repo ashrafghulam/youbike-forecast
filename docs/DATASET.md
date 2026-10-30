@@ -57,7 +57,7 @@ Names and capacity come from the station's most recent reading. The "YouBike2.0_
 
 ### `weather.parquet`: observed weather
 
-One row per weather point per 15-minute observation: `temperature_2m` (°C), `relative_humidity_2m` (%), `apparent_temperature` (°C), `precipitation` and `rain` (mm), `weather_code` (WMO code), `wind_speed_10m` (km/h), `cloud_cover` (%).
+One row per weather point per 15-minute observation. Open-Meteo sometimes revises the value for a period on a later fetch; the **first** version is kept, because that is what was known at the time. Columns: `temperature_2m` (°C), `relative_humidity_2m` (%), `apparent_temperature` (°C), `precipitation` and `rain` (mm), `weather_code` (WMO code), `wind_speed_10m` (km/h), `cloud_cover` (%).
 
 ### `weather_forecast.parquet`: forecast as known at the time
 

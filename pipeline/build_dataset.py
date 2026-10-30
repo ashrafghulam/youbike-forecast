@@ -189,7 +189,9 @@ def load_weather(raw: Path):
         except Exception as e:
             bad.append(f"{path.relative_to(raw)}: {e!r}")
 
-    obs = pd.DataFrame(obs).drop_duplicates(["weather_point", "time"], keep="last")
+    # Open-Meteo can revise the "current" value for the same 15-minute period on a later
+    # fetch. Keep the first version: that is what a live system knew at the time.
+    obs = pd.DataFrame(obs).drop_duplicates(["weather_point", "time"], keep="first")
     fc = pd.DataFrame(fc)
     return obs.sort_values(["weather_point", "time"]).reset_index(drop=True), fc, bad
 
