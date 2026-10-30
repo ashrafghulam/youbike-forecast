@@ -9,12 +9,17 @@ import os
 import sys
 from pathlib import Path
 
-import altair as alt
-import lightgbm as lgb
-import numpy as np
-import pandas as pd
-import pydeck as pdk
-import streamlit as st
+# Keep the maths libraries to a few threads. On some Windows laptops OpenBLAS
+# starts one thread per core and fails with "Memory allocation still failed".
+for _var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "2")
+
+import altair as alt  # noqa: E402
+import lightgbm as lgb  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+import pydeck as pdk  # noqa: E402
+import streamlit as st  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "app"))
