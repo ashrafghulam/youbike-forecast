@@ -228,7 +228,9 @@ with tab_whatif:
 with tab_results:
     summ = REPORTS / "cv_summary.json"
     if not summ.exists():
-        st.info("Validation results appear here after running pipeline/train.py.")
+        st.info("Data collection started on 30 Oct 2026. Day-by-day validation (train on earlier "
+                "days, test on the next day) needs at least three days of data; results will "
+                "appear here once enough days are collected.")
     else:
         s = pd.DataFrame(json.loads(summ.read_text())).T
         s = s.rename(columns={"mae": "MAE (bikes)", "rmse": "RMSE", "within_2": "within 2 bikes",
