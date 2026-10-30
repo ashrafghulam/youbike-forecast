@@ -40,7 +40,9 @@ def load_model():
     if not path.exists():
         return None, None
     meta = json.loads((MODELS / "feature_list.json").read_text())
-    return lgb.Booster(model_file=str(path)), meta
+    # read as text and undo Windows line endings (git on Windows may add \r, which LightGBM can't parse)
+    text = path.read_bytes().decode("utf-8").replace("\r\n", "\n")
+    return lgb.Booster(model_str=text), meta
 
 
 @st.cache_data(ttl=300, show_spinner="Fetching live data and recent history…")

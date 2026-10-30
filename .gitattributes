@@ -1,0 +1,3 @@
+# Keep model files byte-for-byte (LightGBM cannot read Windows line endings)
+models/** -text
+*.json.gz binary

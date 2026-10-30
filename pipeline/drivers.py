@@ -53,7 +53,8 @@ plt.rcParams.update({
 
 
 def load(models: Path, features: Path):
-    model = lgb.Booster(model_file=str(models / "lgbm.txt"))
+    text = (models / "lgbm.txt").read_bytes().decode("utf-8").replace("\r\n", "\n")  # Windows line endings
+    model = lgb.Booster(model_str=text)
     meta = json.loads((models / "feature_list.json").read_text())
     df = pd.read_parquet(features)
     df = df[df["y"].notna() & df["bikes_now"].notna()].reset_index(drop=True)
