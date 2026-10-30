@@ -43,7 +43,10 @@ FEATURES = [
 CATEGORICAL = ["city", "district_en"]
 
 PARAMS = dict(
-    objective="regression",       # squared error on the *change* in bikes
+    # Absolute error (L1) on the *change* in bikes. MAE is the main metric, and the
+    # typical (median) change at a station is near zero, so L1 fits better than
+    # squared error. A first check on day 1 agreed (MAE 2.77 vs 2.88 for squared error).
+    objective="regression_l1",
     learning_rate=0.05,
     num_leaves=63,
     min_data_in_leaf=200,

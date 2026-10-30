@@ -49,7 +49,8 @@ When a baseline has no value (for example "last week" during the first 7 days), 
 LightGBM gradient boosting, one model for all stations.
 
 - It predicts the **change** from now (`y - bikes_now`), and the forecast is `bikes_now + change`, clipped to `[0, capacity]`. Most of the information is in the current count, so learning the change is easier and keeps forecasts sensible.
-- Squared-error loss, fixed settings and a fixed 500 trees. Nothing is tuned on the test days.
+- Absolute-error (L1) loss, because the main metric is MAE and most stations barely change in an hour, so the median change is a better target than the mean. On the first day (trained on 02:00–10:00, tested on 11:00–13:50) L1 gave MAE 2.77, squared error 2.88 (persistence 2.88). This is a single small check and will be confirmed by the full day-by-day validation.
+- Fixed settings and a fixed 500 trees. Nothing is tuned on the test days.
 
 ## Validation
 

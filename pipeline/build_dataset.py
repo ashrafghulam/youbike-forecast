@@ -201,19 +201,20 @@ def gap_summary(snap: pd.DataFrame) -> tuple[int, int, list[str]]:
     if len(slots) < 2:
         return len(slots), 0, []
     expected = pd.date_range(slots.iloc[0], slots.iloc[-1], freq=SLOT)
-    missing = expected.difference(slots)
+    missing = list(expected.difference(slots))
+    step = pd.Timedelta(SLOT)
     # group missing slots into runs for readability
     runs, start, prev = [], None, None
     for t in missing:
         if start is None:
             start = prev = t
-        elif t - prev == pd.Timedelta(SLOT):
+        elif t - prev == step:
             prev = t
         else:
             runs.append((start, prev)); start = prev = t
     if start is not None:
         runs.append((start, prev))
-    text = [f"{a:%m-%d %H:%M} to {b:%m-%d %H:%M} ({int((b - a) / pd.Timedelta(SLOT)) + 1} slots)" for a, b in runs]
+    text = [f"{a:%m-%d %H:%M} to {b:%m-%d %H:%M} ({(b - a) // step + 1} slots)" for a, b in runs]
     return len(expected), len(missing), text
 
 
