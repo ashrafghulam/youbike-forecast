@@ -34,6 +34,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Libraries for the website forecast. If this fails, collection still runs.
+      - name: Install forecast libraries
+        continue-on-error: true
+        run: pip install -q -r app/requirements.txt
+
       - name: Collect every 10 minutes for ~5.5 hours
         run: |
           git config user.name  "youbike-collector"
@@ -41,7 +46,9 @@ jobs:
           end=$(( $(date +%s) + 330 * 60 ))
           while [ "$(date +%s)" -lt "$end" ]; do
             python collector/collect.py || echo "::warning::a source failed at $(date -u +%H:%M)Z (see manifest)"
-            git add data/
+            # refresh the website forecast; never allowed to stop collection
+            timeout 240 python web/make_forecast.py || echo "::warning::website forecast not updated at $(date -u +%H:%M)Z"
+            git add data/ docs/data/
             if ! git diff --cached --quiet; then
               git commit -q -m "data: snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
               for i in 1 2 3 4 5; do

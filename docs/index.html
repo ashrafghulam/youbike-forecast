@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YouBike Next Hour</title>
+<meta name="description" content="Live forecast of bikes at every YouBike station in Taipei and New Taipei, one hour ahead.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='16' cy='42' r='12' fill='none' stroke='%23e34948' stroke-width='5'/%3E%3Ccircle cx='48' cy='42' r='12' fill='none' stroke='%23e34948' stroke-width='5'/%3E%3Cpath d='M16 42l10-20h14l8 20M26 22l8 20' fill='none' stroke='%23e34948' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3ef;
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-solid: #ffffff;
+  --line: #e4e3df;
+  --ink: #16161a;
+  --ink-2: #52514e;
+  --ink-3: #8a8983;
+  --empty: #e34948;
+  --empty-soft: #fde8e7;
+  --ok: #9a988f;
+  --ok-soft: #efeeea;
+  --full: #1c5cab;
+  --full-soft: #e3edf9;
+  --accent: #1c5cab;
+  --shadow: 0 8px 30px rgba(20, 20, 30, 0.12);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111113;
+    --panel: rgba(26, 26, 29, 0.94);
+    --panel-solid: #1a1a1d;
+    --line: #2e2e33;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --ink-3: #8f8e88;
+    --empty: #ef6a69;
+    --empty-soft: #3a1d1d;
+    --ok: #7c7b75;
+    --ok-soft: #26262a;
+    --full: #5b9cec;
+    --full-soft: #172538;
+    --accent: #5b9cec;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111113; --panel: rgba(26, 26, 29, 0.94); --panel-solid: #1a1a1d; --line: #2e2e33;
+  --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e88;
+  --empty: #ef6a69; --empty-soft: #3a1d1d; --ok: #7c7b75; --ok-soft: #26262a;
+  --full: #5b9cec; --full-soft: #172538; --accent: #5b9cec; --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 Inter, "Noto Sans TC", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+#map { position: fixed; inset: 0; }
+button { font: inherit; color: inherit; }
+
+/* ---------- side panel ---------- */
+.panel {
+  position: fixed; top: 16px; left: 16px; bottom: 16px; width: 360px; z-index: 5;
+  background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+}
+.head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.brand .sub { color: var(--ink-3); font-size: 12px; }
+.time { margin-top: 10px; font-size: 13px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.time b { color: var(--ink); font-weight: 600; }
+.dot-live { width: 8px; height: 8px; border-radius: 50%; background: #2fb37a; box-shadow: 0 0 0 3px rgba(47,179,122,.2); }
+
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 18px; }
+.kpi { border-radius: 10px; padding: 10px; background: var(--ok-soft); cursor: pointer; border: 2px solid transparent; text-align: left; }
+.kpi.active { border-color: var(--ink); }
+.kpi .v { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.kpi .l { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+.kpi .d { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.kpi.empty { background: var(--empty-soft); } .kpi.empty .v { color: var(--empty); }
+.kpi.full { background: var(--full-soft); } .kpi.full .v { color: var(--full); }
+
+.search { padding: 0 18px 10px; }
+.search input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel-solid); color: var(--ink); font: inherit; outline: none; }
+.search input:focus { border-color: var(--accent); }
+.chips { display: flex; gap: 6px; padding: 0 18px 10px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--panel-solid); border-radius: 999px; padding: 5px 11px;
+  font-size: 12.5px; cursor: pointer; color: var(--ink-2); }
+.chip.active { background: var(--ink); color: var(--panel-solid); border-color: var(--ink); }
+
+.listhead { padding: 6px 18px; font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--line); }
+.list { overflow-y: auto; flex: 1; padding: 0 8px 8px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 10px; border-radius: 10px; cursor: pointer; align-items: center; }
+.row:hover { background: var(--ok-soft); }
+.row .n { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .m { font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .nums { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .nums .to { font-weight: 700; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+.pill.empty { background: var(--empty-soft); color: var(--empty); }
+.pill.full { background: var(--full-soft); color: var(--full); }
+.pill.ok { background: var(--ok-soft); color: var(--ink-2); }
+
+.foot { padding: 10px 18px; border-top: 1px solid var(--line); display: flex; gap: 12px; font-size: 12.5px; color: var(--ink-2); align-items: center; }
+.foot a { color: var(--accent); text-decoration: none; }
+.foot .sp { flex: 1; }
+
+/* ---------- map controls ---------- */
+.ctrl { position: fixed; top: 16px; right: 16px; z-index: 5; display: flex; gap: 8px; }
+.btn { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer;
+  box-shadow: var(--shadow); backdrop-filter: blur(12px); font-weight: 500; }
+.btn.on { background: var(--ink); color: var(--panel-solid); }
+.legend { position: fixed; right: 16px; bottom: 28px; z-index: 5; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12.5px; min-width: 210px; }
+.legend .t { font-weight: 600; margin-bottom: 6px; }
+.legend .i { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.legend .i span:last-child { margin-left: auto; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.legend .note { color: var(--ink-3); font-size: 11.5px; margin-top: 6px; }
+
+/* ---------- station card ---------- */
+.card { position: fixed; z-index: 6; top: 70px; right: 16px; width: 340px; background: var(--panel-solid);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; display: none; }
+.card.show { display: block; }
+.card .x { position: absolute; top: 10px; right: 10px; border: 0; background: none; font-size: 20px; cursor: pointer; color: var(--ink-3); line-height: 1; }
+.card h2 { margin: 0 24px 0 0; font-size: 17px; }
+.card .zh { color: var(--ink-2); font-size: 13.5px; }
+.card .meta { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+.big { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; }
+.big .box { flex: 1; border-radius: 12px; padding: 10px 12px; background: var(--ok-soft); }
+.big .box .k { font-size: 12px; color: var(--ink-2); }
+.big .box .v { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big .arrow { font-size: 22px; color: var(--ink-3); }
+.big .box.empty { background: var(--empty-soft); } .big .box.empty .v { color: var(--empty); }
+.big .box.full { background: var(--full-soft); } .big .box.full .v { color: var(--full); }
+.verdict { font-size: 13.5px; margin: 8px 0 12px; }
+.bar { height: 10px; border-radius: 6px; background: var(--ok-soft); position: relative; overflow: hidden; margin: 4px 0 2px; }
+.bar i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 6px; }
+.barlab { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-3); }
+.why { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.why .t { font-weight: 600; font-size: 13px; }
+.why .s { font-size: 12px; color: var(--ink-3); margin-bottom: 8px; }
+.wrow { display: grid; grid-template-columns: 1fr 90px 46px; gap: 8px; align-items: center; font-size: 13px; margin: 6px 0; }
+.wbar { height: 8px; position: relative; background: var(--ok-soft); border-radius: 4px; }
+.wbar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.wbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--ink-3); }
+.wval { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* ---------- about ---------- */
+.modal { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; padding: 16px; }
+.modal.show { display: flex; }
+.modal .in { background: var(--panel-solid); border-radius: var(--radius); max-width: 620px; width: 100%; max-height: 85vh; overflow: auto; padding: 22px 24px; box-shadow: var(--shadow); }
+.modal h3 { margin: 0 0 6px; font-size: 18px; }
+.modal h4 { margin: 16px 0 4px; font-size: 14px; }
+.modal p, .modal li { color: var(--ink-2); font-size: 13.5px; }
+.modal a { color: var(--accent); }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.step { background: var(--ok-soft); border-radius: 10px; padding: 10px; font-size: 12.5px; }
+.step b { display: block; font-size: 13px; margin-bottom: 2px; color: var(--ink); }
+
+.loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 30; background: var(--bg); color: var(--ink-2); font-size: 15px; }
+.tip { position: fixed; z-index: 15; pointer-events: none; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; box-shadow: var(--shadow); font-size: 12.5px; display: none; max-width: 260px; }
+.maplibregl-ctrl-attrib { font-size: 10px; }
+.maplibregl-ctrl-bottom-right { bottom: 180px; right: 6px; }
+@media (max-width: 760px) { .maplibregl-ctrl-bottom-right { bottom: 50vh; } }
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 48vh; border-radius: 16px 16px 0 0; }
+  .head { padding: 12px 16px 8px; }
+  .kpis { padding: 8px 16px; } .search, .chips { padding-left: 16px; padding-right: 16px; }
+  .kpi .v { font-size: 18px; }
+  .legend { display: none; }
+  .card { top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: 16px 16px 0 0; max-height: 70vh; overflow: auto; }
+  .ctrl { top: 12px; right: 12px; }
+  .steps { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">Loading the latest forecast…</div>
+<div id="map"></div>
+<div class="tip" id="tip"></div>
+
+<aside class="panel">
+  <div class="head">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--empty)"/><circle cx="19" cy="41" r="9" fill="none" stroke="#fff" stroke-width="4"/><circle cx="45" cy="41" r="9" fill="none" stroke="#fff" stroke-width="4"/><path d="M19 41l8-15h11l7 15M27 26l7 15M24 20h7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><h1>YouBike: the next hour</h1><div class="sub">Taipei &amp; New Taipei · 微笑單車一小時預測</div></div>
+    </div>
+    <div class="time"><span class="dot-live"></span>Data <b id="tData">–</b> · forecast for <b id="tFc">–</b></div>
+  </div>
+  <div class="kpis">
+    <button class="kpi empty" data-f="empty"><div class="v" id="kEmpty">–</div><div class="l">will be empty</div><div class="d" id="dEmpty"></div></button>
+    <button class="kpi full" data-f="full"><div class="v" id="kFull">–</div><div class="l">will be full</div><div class="d" id="dFull"></div></button>
+    <button class="kpi" data-f="drop"><div class="v" id="kDrop">–</div><div class="l">dropping fast</div><div class="d">3+ bikes in 1 h</div></button>
+  </div>
+  <div class="search"><input id="q" type="search" placeholder="Find a station · 搜尋站點 (e.g. Taipei 101, 台大)" autocomplete="off"></div>
+  <div class="chips" id="chips">
+    <button class="chip active" data-f="all">All</button>
+    <button class="chip" data-f="empty">Will be empty</button>
+    <button class="chip" data-f="full">Will be full</button>
+    <button class="chip" data-f="drop">Biggest drops</button>
+    <button class="chip" data-f="gain">Biggest gains</button>
+  </div>
+  <div class="listhead" id="listhead"></div>
+  <div class="list" id="list"></div>
+  <div class="foot">
+    <a href="#" id="aboutBtn">How it works</a>
+    <a href="https://youbike-forecast.streamlit.app" target="_blank" rel="noopener">Analysis app</a>
+    <span class="sp"></span>
+    <a href="https://github.com/ashrafghulam/youbike-forecast" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</aside>
+
+<div class="ctrl">
+  <button class="btn on" id="b3d" title="Switch between 3D columns and flat dots">3D</button>
+  <button class="btn" id="bTheme" title="Light / dark" aria-label="Switch light or dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+</div>
+
+<div class="legend">
+  <div class="t">In one hour</div>
+  <div class="i"><span class="sw" style="background:var(--empty)"></span>Will be empty (≤ 2 bikes)<span id="lEmpty"></span></div>
+  <div class="i"><span class="sw" style="background:var(--ok)"></span>OK<span id="lOk"></span></div>
+  <div class="i"><span class="sw" style="background:var(--full)"></span>Will be full (≤ 2 free docks)<span id="lFull"></span></div>
+  <div class="i"><span class="sw" style="background:#eda100"></span>Selected station<span></span></div>
+  <div class="note">Column height = bikes expected in one hour.</div>
+</div>
+
+<div class="card" id="card"></div>
+
+<div class="modal" id="about"><div class="in">
+  <h3>How it works</h3>
+  <p>Every 10 minutes a scheduled job saves the bike count of all ~3,400 YouBike stations in Taipei and New Taipei, plus the weather at 24 points. A machine-learning model (LightGBM) trained on this history predicts how many bikes each station will have one hour later.</p>
+  <div class="steps">
+    <div class="step"><b>1. Collect</b>YouBike + weather, every 10 min</div>
+    <div class="step"><b>2. Clean</b>Timestamps, quality flags, rebuildable</div>
+    <div class="step"><b>3. Predict</b>Change in bikes over the next hour</div>
+    <div class="step"><b>4. Explain</b>Top reasons for each forecast</div>
+  </div>
+  <h4>What the model looks at</h4>
+  <ul>
+    <li>Bikes and free docks right now, and how they changed in the last hour</li>
+    <li>The same time yesterday and one week ago</li>
+    <li>The 5 nearest stations within 1 km</li>
+    <li>Time of day, weekday or weekend, location</li>
+    <li>Current weather and the rain forecast for the next hour</li>
+  </ul>
+  <h4>"Why" on each station</h4>
+  <p>For every station the model's forecast is split into the effect of each group of inputs, in bikes. A negative number means that group pushes the forecast down (fewer bikes in an hour).</p>
+  <h4>Limits</h4>
+  <p>Data collection started on 30 Oct 2026, so the model has seen only a few days, with little rain and no holidays. Forecasts are estimates, most useful for spotting stations that are about to run empty or full.</p>
+  <p><a href="https://github.com/ashrafghulam/youbike-forecast" target="_blank" rel="noopener">Code, data and documentation on GitHub</a> · <a href="https://youbike-forecast.streamlit.app" target="_blank" rel="noopener">Analysis app with what-if scenarios</a></p>
+  <p style="text-align:right"><button class="btn" id="aboutClose">Close</button></p>
+</div></div>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
+<script>
+(() => {
+  const RAW = "https://raw.githubusercontent.com/ashrafghulam/youbike-forecast/main/docs/data/";
+  const STYLES = {
+    light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+    dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  };
+  const $ = (id) => document.getElementById(id);
+  const state = { stations: [], byId: {}, fc: null, filter: "all", query: "", is3d: true, selected: null };
+
+  // ---------- theme ----------
+  const root = document.documentElement;
+  const isDark = () => root.dataset.theme ? root.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  try { const t = localStorage.getItem("yb-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  const css = (v) => getComputedStyle(root).getPropertyValue(v).trim();
+  const rgb = (hex) => { const h = hex.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  let C = {};
+  const readColors = () => { C = { empty: rgb(css("--empty")), ok: rgb(css("--ok")), full: rgb(css("--full")) }; };
+
+  // ---------- data ----------
+  async function getJSON(name) {
+    const bust = "?t=" + Math.floor(Date.now() / 60000);
+    for (const base of [RAW, "data/"]) {
+      try { const r = await fetch(base + name + bust, { cache: "no-store" }); if (r.ok) return await r.json(); } catch (e) {}
+    }
+    throw new Error("could not load " + name);
+  }
+
+  function enrich() {
+    const low = state.fc.low;
+    for (const s of state.stations) {
+      const f = state.fc.s[s.id];
+      if (!f) { s.has = false; continue; }
+      s.has = true;
+      s.now = f[0]; s.docks = f[1]; s.fc = f[2]; s.why = f[3];
+      s.usable = s.docks == null ? s.cap : s.now + s.docks;
+      s.change = s.fc - s.now;
+      const r = Math.round(s.fc);
+      s.status = r <= low ? "empty" : (s.usable - r <= low ? "full" : "ok");
+      s.statusNow = s.now <= low ? "empty" : (s.usable - s.now <= low ? "full" : "ok");
+    }
+  }
+
+  const fmtTime = (iso) => { const d = new Date(iso); return d.toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" }); };
+  const fmtHM = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
+
+  // ---------- filtering ----------
+  function matches(s) {
+    if (!s.has) return false;
+    if (state.query) {
+      const q = state.query.toLowerCase();
+      if (!(s.en.toLowerCase().includes(q) || s.zh.includes(state.query) || s.d.toLowerCase().includes(q) || s.id.includes(q))) return false;
+    }
+    switch (state.filter) {
+      case "empty": return s.status === "empty";
+      case "full": return s.status === "full";
+      case "drop": return s.change <= -3;
+      case "gain": return s.change >= 3;
+      default: return true;
+    }
+  }
+  function sorted(list) {
+    const by = {
+      empty: (a, b) => a.fc - b.fc || a.change - b.change,
+      full: (a, b) => (a.usable - a.fc) - (b.usable - b.fc),
+      drop: (a, b) => a.change - b.change,
+      gain: (a, b) => b.change - a.change,
+      all: (a, b) => Math.abs(b.change) - Math.abs(a.change),
+    }[state.filter];
+    return list.sort(by);
+  }
+
+  // ---------- panel ----------
+  const label = { empty: "empty", full: "full", ok: "OK" };
+  function renderPanel() {
+    const all = state.stations.filter(s => s.has);
+    const cnt = (k, key = "status") => all.filter(s => s[key] === k).length;
+    const e1 = cnt("empty"), e0 = cnt("empty", "statusNow"), f1 = cnt("full"), f0 = cnt("full", "statusNow");
+    $("kEmpty").textContent = e1.toLocaleString(); $("dEmpty").textContent = `${e0.toLocaleString()} now`;
+    $("kFull").textContent = f1.toLocaleString(); $("dFull").textContent = `${f0.toLocaleString()} now`;
+    $("kDrop").textContent = all.filter(s => s.change <= -3).length.toLocaleString();
+    $("lEmpty").textContent = e1.toLocaleString(); $("lFull").textContent = f1.toLocaleString();
+    $("lOk").textContent = (all.length - e1 - f1).toLocaleString();
+    document.querySelectorAll(".kpi").forEach(k => k.classList.toggle("active", k.dataset.f === state.filter));
+    document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c.dataset.f === state.filter));
+
+    const rows = sorted(all.filter(matches));
+    const titles = { all: "Stations changing most", empty: "Need bikes soon, emptiest first", full: "Need space soon, fullest first",
+                     drop: "Losing the most bikes", gain: "Gaining the most bikes" };
+    $("listhead").textContent = `${titles[state.filter]} · ${rows.length.toLocaleString()} station${rows.length === 1 ? "" : "s"}`;
+    const frag = document.createDocumentFragment();
+    for (const s of rows.slice(0, 120)) {
+      const el = document.createElement("div");
+      el.className = "row";
+      const ch = s.change >= 0 ? `+${s.change.toFixed(1)}` : s.change.toFixed(1);
+      el.innerHTML = `<div style="min-width:0"><div class="n"></div><div class="m"></div></div>
+        <div class="nums">${s.now} → <span class="to">${Math.round(s.fc)}</span><span class="pill ${s.status}">${label[s.status]}</span>
+        <div class="m">${ch} bikes</div></div>`;
+      el.querySelector(".n").textContent = s.en;
+      el.querySelector(".m").textContent = `${s.zh} · ${s.d}`;
+      el.onclick = () => select(s, true);
+      frag.appendChild(el);
+    }
+    $("list").replaceChildren(frag);
+  }
+
+  // ---------- station card ----------
+  function select(s, fly) {
+    state.selected = s;
+    const pct = (v) => Math.max(0, Math.min(100, 100 * v / Math.max(s.cap, 1)));
+    const col = (st) => `var(--${st})`;
+    const r = Math.round(s.fc);
+    const verdict = {
+      empty: "Likely <b>empty or nearly empty</b> in one hour. Hard to rent a bike here.",
+      full: "Likely <b>full or nearly full</b> in one hour. Hard to return a bike here.",
+      ok: s.change <= -3 ? "Still OK in one hour, but <b>losing bikes</b>." : s.change >= 3 ? "Still OK in one hour, <b>filling up</b>." : "Should be <b>fine</b> in one hour.",
+    }[s.status];
+    const maxAbs = Math.max(1, ...s.why.map(w => Math.abs(w[1])));
+    const why = s.why.map(([g, v]) => {
+      const w = 50 * Math.abs(v) / maxAbs, left = v < 0 ? 50 - w : 50;
+      return `<div class="wrow"><span>${state.fc.reasons[g]}</span>
+        <span class="wbar"><i style="left:${left}%;width:${w}%;background:${v < 0 ? "var(--empty)" : "var(--full)"}"></i></span>
+        <span class="wval">${v > 0 ? "+" : ""}${v.toFixed(1)}</span></div>`;
+    }).join("");
+    $("card").innerHTML = `<button class="x" aria-label="Close">×</button>
+      <h2></h2><div class="zh"></div><div class="meta"></div>
+      <div class="big">
+        <div class="box ${s.statusNow}"><div class="k">Bikes now</div><div class="v">${s.now}</div></div>
+        <div class="arrow">→</div>
+        <div class="box ${s.status}"><div class="k">In 1 hour (${fmtHM(state.fc.forecast_time)})</div><div class="v">~${r}</div></div>
+      </div>
+      <div class="verdict">${verdict}</div>
+      <div class="bar"><i style="width:${pct(s.now)}%;background:${col(s.statusNow)};opacity:.35"></i><i style="width:${pct(s.fc)}%;background:${col(s.status)};height:4px;top:3px"></i></div>
+      <div class="barlab"><span>0</span><span>${s.usable} usable of ${s.cap} docks</span></div>
+      <div class="why"><div class="t">Why this forecast?</div>
+        <div class="s">Biggest effects on the change over the next hour, in bikes</div>${why}</div>`;
+    const card = $("card");
+    card.querySelector("h2").textContent = s.en;
+    card.querySelector(".zh").textContent = s.zh;
+    card.querySelector(".meta").textContent = `${s.d} · ${s.city === "taipei" ? "Taipei" : "New Taipei"} · station ${s.id}`;
+    card.querySelector(".x").onclick = () => { card.classList.remove("show"); state.selected = null; draw(); };
+    card.classList.add("show");
+    if (fly) map.flyTo({ center: [s.lon, s.lat], zoom: 15.5, pitch: state.is3d ? 55 : 0, speed: 1.2 });
+    draw();
+  }
+
+  // ---------- map ----------
+  let map, overlay;
+  function layers() {
+    const data = state.stations.filter(s => s.has);
+    const active = new Set(data.filter(matches).map(s => s.id));
+    const filtering = state.filter !== "all" || state.query;
+    const color = (s) => {
+      if (state.selected && state.selected.id === s.id) return [237, 161, 0, 255];   // amber = the station you picked
+      return [...C[s.status], !filtering || active.has(s.id) ? 235 : 35];
+    };
+    const common = {
+      id: "stations", data, pickable: true, getPosition: s => [s.lon, s.lat], getFillColor: color,
+      updateTriggers: { getFillColor: [state.filter, state.query, state.selected && state.selected.id, isDark()] },
+      onHover: ({ object, x, y }) => {
+        const t = $("tip");
+        if (!object) { t.style.display = "none"; return; }
+        t.style.display = "block"; t.style.left = (x + 14) + "px"; t.style.top = (y + 14) + "px";
+        t.innerHTML = `<b></b><br><span style="color:var(--ink-2)">now ${object.now} → in 1 h ~${Math.round(object.fc)}</span>`;
+        t.querySelector("b").textContent = object.en;
+      },
+      onClick: ({ object }) => object && select(object, false),
+    };
+    const alertData = data.filter(s => s.status !== "ok");
+    const glow = new deck.ScatterplotLayer({
+      id: "glow", data: alertData, getPosition: s => [s.lon, s.lat], radiusUnits: "meters", getRadius: 75,
+      radiusMinPixels: 3, radiusMaxPixels: 40,
+      getFillColor: s => [...C[s.status], !filtering || active.has(s.id) ? 95 : 15],
+      updateTriggers: { getFillColor: [state.filter, state.query, isDark()] },
+    });
+    const sel = state.selected ? [new deck.ScatterplotLayer({
+      id: "selected", data: [state.selected], getPosition: s => [s.lon, s.lat], radiusUnits: "pixels", getRadius: 18,
+      filled: false, stroked: true, lineWidthUnits: "pixels", getLineWidth: 3,
+      getLineColor: isDark() ? [240, 239, 236, 255] : [22, 22, 26, 255],
+    })] : [];
+    if (state.is3d) {
+      return [glow, new deck.ColumnLayer({ ...common, diskResolution: 14, radius: 36, extruded: true,
+        elevationScale: 7, getElevation: s => Math.max(s.fc, 1.2), material: { ambient: 0.55, diffuse: 0.65, shininess: 24 },
+        transitions: { getElevation: 600 } }), ...sel];
+    }
+    return [glow, new deck.ScatterplotLayer({ ...common, radiusUnits: "pixels", getRadius: 5,
+      stroked: true, getLineColor: [255, 255, 255, 170], lineWidthUnits: "pixels", getLineWidth: 1 }), ...sel];
+  }
+  function draw() { if (overlay) overlay.setProps({ layers: layers() }); }
+
+  function initMap() {
+    map = new maplibregl.Map({
+      container: "map", style: STYLES[isDark() ? "dark" : "light"],
+      center: [121.53, 25.04], zoom: 11.6, pitch: 50, bearing: -15, antialias: true, attributionControl: { compact: true },
+    });
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+    overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
+    map.addControl(overlay);
+    map.on("load", draw);
+  }
+
+  // ---------- events ----------
+  document.querySelectorAll("[data-f]").forEach(b => b.onclick = () => {
+    state.filter = state.filter === b.dataset.f && b.classList.contains("kpi") ? "all" : b.dataset.f;
+    renderPanel(); draw();
+  });
+  let qt;
+  $("q").oninput = (e) => { clearTimeout(qt); qt = setTimeout(() => { state.query = e.target.value.trim(); renderPanel(); draw(); }, 150); };
+  $("b3d").onclick = () => {
+    state.is3d = !state.is3d; $("b3d").classList.toggle("on", state.is3d); $("b3d").textContent = state.is3d ? "3D" : "2D";
+    map.easeTo({ pitch: state.is3d ? 50 : 0, bearing: state.is3d ? -15 : 0, duration: 700 }); draw();
+  };
+  $("bTheme").onclick = () => {
+    const next = isDark() ? "light" : "dark"; root.dataset.theme = next;
+    try { localStorage.setItem("yb-theme", next); } catch (e) {}
+    readColors(); map.setStyle(STYLES[next]); draw();
+  };
+  $("aboutBtn").onclick = (e) => { e.preventDefault(); $("about").classList.add("show"); };
+  $("aboutClose").onclick = () => $("about").classList.remove("show");
+  $("about").onclick = (e) => { if (e.target.id === "about") $("about").classList.remove("show"); };
+
+  // ---------- start ----------
+  async function load(first) {
+    const [st, fc] = await Promise.all([first ? getJSON("stations.json") : Promise.resolve(null), getJSON("forecast.json")]);
+    if (st) { state.stations = st.stations; state.byId = Object.fromEntries(st.stations.map(s => [s.id, s])); }
+    state.fc = fc; enrich();
+    $("tData").textContent = fmtTime(fc.data_time); $("tFc").textContent = fmtHM(fc.forecast_time);
+    renderPanel(); draw();
+    if (state.selected) select(state.byId[state.selected.id], false);
+  }
+  readColors(); initMap();
+  load(true).then(() => $("loading").remove()).catch(err => { $("loading").textContent = "Could not load the forecast. Please try again in a minute."; console.error(err); });
+  setInterval(() => load(false).catch(() => {}), 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
