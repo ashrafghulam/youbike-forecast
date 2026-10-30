@@ -1,4 +1,15 @@
-# App
+# Website and app
+
+## 3D live map (website)
+
+`docs/index.html`, published with GitHub Pages. One page, no server:
+
+- Every station is a 3D column: height = bikes expected in one hour, colour = red (will be empty, ≤ 2 bikes), grey (OK), dark blue (will be full, ≤ 2 free docks). A soft glow marks stations about to go empty or full, so problem areas are visible from far away.
+- Search by English or Chinese name, filter by "will be empty / will be full / biggest drops / biggest gains", and click a station for a card with now → in 1 hour and the three biggest reasons for the forecast.
+- Light and dark mode, works on phones.
+- Data: `docs/data/stations.json` and `docs/data/forecast.json`, written by `web/make_forecast.py` inside the collector job after every snapshot, using the same feature code and model as training. The reasons are LightGBM's built-in SHAP values (`pred_contrib`), summed into seven groups. If this step fails, collection carries on.
+
+## Analysis app (Streamlit)
 
 A Streamlit dashboard for the live one-hour forecast.
 

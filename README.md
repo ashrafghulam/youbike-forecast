@@ -8,7 +8,7 @@ Predict how many bikes a Taipei / New Taipei YouBike station will have one hour 
 - [x] Dataset build (`pipeline/build_dataset.py`, documented in [docs/DATASET.md](docs/DATASET.md))
 - [x] Baselines, model and time-based validation (`pipeline/features.py`, `pipeline/train.py`, [docs/MODEL.md](docs/MODEL.md)), results after the final run
 - [x] Drivers and what-if scenarios (`pipeline/drivers.py`), results after the final run
-- [x] App (`app/app.py`, [docs/APP.md](docs/APP.md))
+- [x] 3D live map website (`docs/index.html`, refreshed after every snapshot) and analysis app (`app/app.py`, [docs/APP.md](docs/APP.md))
 - [ ] Presentation
 
 ## Collection pipeline
@@ -64,13 +64,12 @@ python -m pytest tests/          # checks that no future data leaks into feature
 
 See [docs/MODEL.md](docs/MODEL.md).
 
-## App
+## Website and app
 
-```bash
-streamlit run app/app.py
-```
+- **3D live map:** https://ashrafghulam.github.io/youbike-forecast/ . A static page (`docs/index.html`, deck.gl + MapLibre). After every snapshot the collector runs `web/make_forecast.py`, which writes `docs/data/forecast.json` with the forecast and the top three reasons for each station. The page loads instantly and refreshes every 5 minutes.
+- **Analysis app:** https://youbike-forecast.streamlit.app (`streamlit run app/app.py`). Station history, "why" for each forecast, what-if scenarios and validation results.
 
-Live map of the one-hour forecast, station history, what-if sliders and validation results. See [docs/APP.md](docs/APP.md).
+See [docs/APP.md](docs/APP.md).
 
 ## Run the collector locally
 

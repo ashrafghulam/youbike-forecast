@@ -28,11 +28,22 @@ import live  # noqa: E402
 MODELS = Path(os.environ.get("YOUBIKE_MODELS", ROOT / "models"))
 REPORTS = Path(os.environ.get("YOUBIKE_REPORTS", ROOT / "reports"))
 LOW = 2
-STATUS = {  # label -> colour (RGB)
+STATUS = {  # label -> colour (RGB); red / grey / deep blue are easy to tell apart, also for colour-blind viewers
     "near empty (≤2 bikes)": (227, 73, 72),
-    "ok": (42, 120, 214),
-    "near full (≤2 docks)": (98, 80, 214),
+    "ok": (154, 152, 143),
+    "near full (≤2 docks)": (28, 92, 171),
 }
+WEBSITE = "https://ashrafghulam.github.io/youbike-forecast/"
+REASONS = [  # same groups as web/make_forecast.py and pipeline/drivers.py
+    ("Bikes at the station now", ["bikes_now", "docks_now", "fill_now", "capacity"]),
+    ("Trend in the last hour", ["chg_10m", "chg_30m", "chg_60m"]),
+    ("Same time yesterday / last week", ["bikes_yday_target", "bikes_week_target", "chg_yday_next_hour"]),
+    ("Nearby stations", ["nbr_fill_now", "nbr_chg_30m", "nbr_count"]),
+    ("Time of day and weekday", ["target_hour", "dow", "is_weekend", "is_holiday"]),
+    ("Location", ["city", "district_en", "lat", "lon"]),
+    ("Weather", ["temp_now", "precip_now", "humidity_now", "wind_now",
+                 "fc_precip_1h", "fc_precip_prob_1h", "fc_temp_1h"]),
+]
 
 st.set_page_config(page_title="YouBike 1-hour forecast", page_icon="🚲", layout="wide")
 
@@ -57,14 +68,27 @@ def load_live():
     return live.build_live(history=history, fetch_now=not os.environ.get("YOUBIKE_NO_FETCH"))
 
 
-def predict(model, meta, X: pd.DataFrame) -> np.ndarray:
+def model_input(meta, X: pd.DataFrame) -> pd.DataFrame:
     X = X.copy()
     for c in meta["categorical"]:
         cats = meta["categories"][c]
         vals = X[c].astype(str)
         X[c] = pd.Categorical(vals.where(vals.isin(cats)), categories=cats)   # unseen -> missing
-    change = model.predict(X[meta["features"]])
+    return X[meta["features"]]
+
+
+def predict(model, meta, X: pd.DataFrame) -> np.ndarray:
+    change = model.predict(model_input(meta, X))
     return np.clip(X["bikes_now"].values + change, 0, X["capacity"].values)
+
+
+def reasons(model, meta, row: pd.DataFrame) -> pd.DataFrame:
+    """Split one forecast into the effect of each group of inputs (LightGBM's built-in SHAP values)."""
+    contrib = model.predict(model_input(meta, row), pred_contrib=True)[0, :-1]
+    idx = {f: i for i, f in enumerate(meta["features"])}
+    out = pd.DataFrame({"reason": [n for n, _ in REASONS],
+                        "bikes": [contrib[[idx[f] for f in cols if f in idx]].sum() for _, cols in REASONS]})
+    return out.reindex(out["bikes"].abs().sort_values(ascending=False).index)
 
 
 def status(bikes, usable):
@@ -72,15 +96,24 @@ def status(bikes, usable):
                     np.where(usable - np.round(bikes) <= LOW, "near full (≤2 docks)", "ok"))
 
 
-def station_map(df: pd.DataFrame, value_col: str, tooltip: str):
+def station_map(df: pd.DataFrame, value_col: str, tooltip: str, key: str = "map"):
     d = df.copy()
     d["color"] = d["status"].map(STATUS).apply(list)
-    d["radius"] = 25 + 2 * np.sqrt(d["capacity"])
-    layer = pdk.Layer("ScatterplotLayer", d, get_position="[lon, lat]", get_fill_color="color",
-                      get_radius="radius", radius_min_pixels=2, radius_max_pixels=9, pickable=True,
-                      opacity=0.85, stroked=False)
-    view = pdk.ViewState(latitude=d["lat"].mean(), longitude=d["lon"].mean(), zoom=10.5)
-    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view, map_style="light",
+    d["elev"] = d[value_col].clip(lower=1.2)
+    three_d = st.toggle("3D columns (height = bikes in one hour)", value=True, key=key)
+    alerts = d[d["status"] != "ok"]
+    glow = pdk.Layer("ScatterplotLayer", alerts, get_position="[lon, lat]", get_fill_color="color",
+                     get_radius=75, radius_min_pixels=3, radius_max_pixels=40, opacity=0.35, pickable=False)
+    if three_d:
+        main = pdk.Layer("ColumnLayer", d, get_position="[lon, lat]", get_fill_color="color",
+                         get_elevation="elev", elevation_scale=7, radius=36, extruded=True, pickable=True,
+                         disk_resolution=14)
+        view = pdk.ViewState(latitude=25.04, longitude=121.53, zoom=11.3, pitch=50, bearing=-15)
+    else:
+        main = pdk.Layer("ScatterplotLayer", d, get_position="[lon, lat]", get_fill_color="color",
+                         get_radius=40, radius_min_pixels=3, radius_max_pixels=9, pickable=True, opacity=0.9)
+        view = pdk.ViewState(latitude=25.04, longitude=121.53, zoom=10.8)
+    st.pydeck_chart(pdk.Deck(layers=[glow, main], initial_view_state=view, map_style="light",
                              tooltip={"html": tooltip}), width="stretch")
     st.caption("  ·  ".join(f"<span style='color:rgb{c}'>●</span> {k}" for k, c in STATUS.items()),
                unsafe_allow_html=True)
@@ -90,6 +123,8 @@ def station_map(df: pd.DataFrame, value_col: str, tooltip: str):
 
 model, meta = load_model()
 st.title("YouBike: bikes one hour from now")
+st.info(f"For a quick look on any device, open the **[3D live map]({WEBSITE})**. "
+        "This app is for analysis: station history, what-if scenarios and model results.", icon="🗺️")
 
 try:
     feats, recent, info = load_live()
@@ -174,6 +209,20 @@ with tab_station:
         x="slot:T", y="bikes:Q", tooltip=[alt.Tooltip("bikes:Q", title="forecast", format=".1f")])
     st.altair_chart(line + pts + fc_line + fc_dot, width="stretch")
     st.caption("Blue: last 2 hours as collected. Orange dashed: forecast for one hour ahead.")
+    if model is not None:
+        st.subheader("Why this forecast?")
+        st.caption("How much each group of inputs moves the forecast for the next hour, in bikes "
+                   "(negative = fewer bikes). Computed with the model's built-in SHAP values.")
+        r = reasons(model, meta, options.loc[label == choice].head(1))
+        r["direction"] = np.where(r["bikes"] < 0, "fewer bikes", "more bikes")
+        bars = alt.Chart(r).mark_bar(cornerRadius=3, height=18).encode(
+            x=alt.X("bikes:Q", title="effect on the next hour (bikes)"),
+            y=alt.Y("reason:N", sort=None, title=None),
+            color=alt.Color("direction:N", scale=alt.Scale(domain=["fewer bikes", "more bikes"],
+                                                           range=["#e34948", "#1c5cab"]), legend=None),
+            tooltip=["reason", alt.Tooltip("bikes:Q", format="+.2f")])
+        rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#8a8983").encode(x="x:Q")
+        st.altair_chart(bars + rule, width="stretch")
 
 # ---------------- what if
 with tab_whatif:
@@ -215,7 +264,7 @@ with tab_whatif:
         m3.metric("Stations whose forecast moves > 1 bike", f"{(diff.abs() > 1).sum():,}")
         X["forecast_r"] = X["forecast"].round(1)
         station_map(X, "forecast",
-                    "<b>{name}</b><br/>now: {bikes_now} bikes<br/>in 1 h (scenario): {forecast_r} bikes")
+                    "<b>{name}</b><br/>now: {bikes_now} bikes<br/>in 1 h (scenario): {forecast_r} bikes", key="map_whatif")
         moved = X.assign(change_vs_real=diff).reindex(diff.abs().sort_values(ascending=False).index).head(15)
         st.dataframe(moved[["name", "district_en", "bikes_now", "forecast", "change_vs_real"]]
                      .rename(columns={"name": "station", "district_en": "district", "bikes_now": "now",
