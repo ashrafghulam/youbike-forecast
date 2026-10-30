@@ -66,8 +66,8 @@ See [docs/MODEL.md](docs/MODEL.md).
 
 ## Website and app
 
-- **3D live map:** https://ashrafghulam.github.io/youbike-forecast/ . A static page (`docs/index.html`, deck.gl + MapLibre). After every snapshot the collector runs `web/make_forecast.py`, which writes `docs/data/forecast.json` with the forecast and the top three reasons for each station. The page loads instantly and refreshes every 5 minutes.
-- **Analysis app:** https://youbike-forecast.streamlit.app (`streamlit run app/app.py`). Station history, "why" for each forecast, what-if scenarios and validation results.
+- **3D live map:** a static page (`docs/index.html`, deck.gl + MapLibre). After every snapshot the collector runs `web/make_forecast.py`, which writes `docs/data/forecast.json` with the forecast and the top three reasons for each station. The page loads instantly and refreshes every 5 minutes.
+- **Analysis app:** `streamlit run app/app.py`. Station history, "why" for each forecast, what-if scenarios and validation results.
 
 See [docs/APP.md](docs/APP.md).
 

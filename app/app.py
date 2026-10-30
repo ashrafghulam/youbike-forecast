@@ -33,7 +33,7 @@ STATUS = {  # label -> colour (RGB); red / grey / deep blue are easy to tell apa
     "ok": (154, 152, 143),
     "near full (≤2 docks)": (28, 92, 171),
 }
-WEBSITE = "https://ashrafghulam.github.io/youbike-forecast/"
+WEBSITE = os.environ.get("YOUBIKE_WEBSITE_URL", "")   # optional link to the 3D map, set outside the code
 REASONS = [  # same groups as web/make_forecast.py and pipeline/drivers.py
     ("Bikes at the station now", ["bikes_now", "docks_now", "fill_now", "capacity"]),
     ("Trend in the last hour", ["chg_10m", "chg_30m", "chg_60m"]),
@@ -123,8 +123,9 @@ def station_map(df: pd.DataFrame, value_col: str, tooltip: str, key: str = "map"
 
 model, meta = load_model()
 st.title("YouBike: bikes one hour from now")
-st.info(f"For a quick look on any device, open the **[3D live map]({WEBSITE})**. "
-        "This app is for analysis: station history, what-if scenarios and model results.", icon="🗺️")
+if WEBSITE:
+    st.info(f"For a quick look on any device, open the **[3D live map]({WEBSITE})**. "
+            "This app is for analysis: station history, what-if scenarios and model results.", icon="🗺️")
 
 try:
     feats, recent, info = load_live()
