@@ -107,7 +107,8 @@ st.caption(f"Data as of {info['fetched_at']:%a %d %b %Y %H:%M} (Taipei) · forec
            f"{info['history_files']} history files used · live fetch: "
            + ", ".join(f"{k} {v}" for k, v in info["live_fetch"].items()))
 if model is None:
-    st.warning("No trained model found in models/. The map shows current counts only.")
+    st.error("No trained model found in models/. Forecasts below are just the current counts "
+             "(change = 0). Run `git pull` to get the latest model, then restart the app.")
 
 with st.sidebar:
     st.header("Filter")
