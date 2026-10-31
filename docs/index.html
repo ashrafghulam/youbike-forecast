@@ -47,7 +47,10 @@ html, body { height: 100%; overflow: hidden; }
 .hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 5; background: var(--panel); border: 1px solid var(--line);
   border-radius: 999px; padding: 7px 14px; font-size: 12.5px; color: var(--ink-2); box-shadow: var(--shadow); pointer-events: none; transition: opacity .4s; }
 
-/* popup */
+/* popup: always above the station layer */
+#map > canvas { z-index: 1; }
+.maplibregl-popup { z-index: 30 !important; }
+.maplibregl-marker { z-index: 25; }
 .maplibregl-popup-content { background: var(--panel); color: var(--ink); border-radius: 14px; padding: 14px 16px 14px; box-shadow: var(--shadow); font: inherit; }
 .maplibregl-popup-tip { border-top-color: var(--panel) !important; border-bottom-color: var(--panel) !important; }
 .maplibregl-popup-close-button { font-size: 20px; color: var(--ink-3); right: 6px; top: 4px; }
@@ -132,7 +135,7 @@ html, body { height: 100%; overflow: hidden; }
   const { STATUS, ORDER, PINS, hexRgb, esc, fmtHM, fmtDay, fmtDist } = YB;
   const STYLES = { light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
                    dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" };
-  const ICON_ZOOM = 13.3;
+  const ICON_ZOOM = 14.2;   // below this, stations are dots (less crowded)
   const $ = (id) => document.getElementById(id);
   const S = { all: [], byId: {}, meta: null, area: "", filter: "", is3d: false, zoom: 12.6, sel: null, near: null };
   const RGB = Object.fromEntries(ORDER.map(k => [k, hexRgb(STATUS[k].color)]));
@@ -201,7 +204,7 @@ html, body { height: 100%; overflow: hidden; }
   function openPopup(s) {
     S.sel = s;
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ offset: S.zoom >= ICON_ZOOM && !S.is3d ? [0, -36] : 12, maxWidth: "320px", focusAfterOpen: false })
+    popup = new maplibregl.Popup({ offset: S.zoom >= ICON_ZOOM && !S.is3d ? [0, -32] : 12, maxWidth: "320px", focusAfterOpen: false })
       .setLngLat([s.lon, s.lat]).setHTML(popupHTML(s)).addTo(map);
     popup.on("close", () => { if (S.sel === s) { S.sel = null; draw(); } });
     draw();
@@ -231,7 +234,7 @@ html, body { height: 100%; overflow: hidden; }
     if (S.zoom >= ICON_ZOOM) {
       return [new deck.IconLayer({ id: "pins", data, ...pick, getPosition: s => [s.lon, s.lat],
         getIcon: s => ({ url: PINS[s.st], width: 96, height: 120, anchorY: 120 }),
-        getSize: s => (S.sel && S.sel.id === s.id ? 46 : 34), sizeUnits: "pixels",
+        getSize: s => (S.sel && S.sel.id === s.id ? 44 : 30), sizeUnits: "pixels",
         getColor: s => [255, 255, 255, alphaFor(s)], updateTriggers: { getColor: trig, getSize: trig } })];
     }
     return [new deck.ScatterplotLayer({ id: "dots", data, ...pick, getPosition: s => [s.lon, s.lat], radiusUnits: "pixels",
