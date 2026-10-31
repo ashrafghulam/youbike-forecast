@@ -9,7 +9,7 @@ model, so the website shows exactly what the model predicts.
 
 Outputs (docs/data/):
     stations.json   static station info (only changes when stations change)
-    forecast.json   bikes now, forecast for +1 h, and the top reasons per station
+    forecast.json   per station: [bikes now, free docks, forecast +1 h, top 3 reasons, last 2 h of counts]
 """
 
 import json
@@ -64,7 +64,7 @@ def latest_fetch_time(data_dir: Path) -> datetime:
 def main():
     data_dir = ROOT / "data"
     now = latest_fetch_time(data_dir)
-    feats, _, info = live.build_live(history=live.LocalHistory(data_dir), fetch_now=False, now=now)
+    feats, recent, info = live.build_live(history=live.LocalHistory(data_dir), fetch_now=False, now=now)
     feats = feats[feats["bikes_now"].notna()].reset_index(drop=True)
 
     model, meta = load_model()
@@ -83,6 +83,12 @@ def main():
     group_vals = np.column_stack([contrib[:, [idx[f] for f in cols if f in idx]].sum(axis=1)
                                   for _, cols in REASONS])
 
+    # last 2 hours of counts per station, on a fixed 10-minute grid (None = no reading)
+    last = recent["slot"].max()
+    hist_slots = pd.date_range(last - pd.Timedelta(hours=2), last, freq="10min")
+    hist = (recent.pivot_table(index="station_id", columns="slot", values="bikes", aggfunc="last")
+            .reindex(columns=hist_slots))
+
     stations, forecast = [], {}
     for i, r in feats.iterrows():
         sid = r["station_id"]
@@ -98,6 +104,8 @@ def main():
             None if pd.isna(docks) else int(docks),
             round(float(fc[i]), 1),
             [[int(g), round(float(group_vals[i, g]), 1)] for g in top],
+            [None if pd.isna(v) else int(v) for v in
+             (hist.loc[sid].to_numpy() if sid in hist.index else [np.nan] * len(hist_slots))],
         ]
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -112,6 +120,7 @@ def main():
         "data_time": data_time.isoformat(timespec="minutes"),
         "forecast_time": (data_time + pd.Timedelta(hours=1)).isoformat(timespec="minutes"),
         "reasons": [name for name, _ in REASONS],
+        "hist_slots": [t.isoformat(timespec="minutes") for t in hist_slots],
         "low": LOW,
         "s": forecast,
     }

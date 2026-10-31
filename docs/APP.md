@@ -1,13 +1,19 @@
 # Website and app
 
-## 3D live map (website)
+## Live map (website)
 
-`docs/index.html`, published with GitHub Pages. One page, no server:
+Two static pages published with GitHub Pages, no server: `docs/index.html` (map) and `docs/station.html` (one station). Shared code in `docs/common.js` and `docs/style.css`.
 
-- Every station is a 3D column: height = bikes expected in one hour, colour = red (will be empty, ≤ 2 bikes), grey (OK), dark blue (will be full, ≤ 2 free docks). A soft glow marks stations about to go empty or full, so problem areas are visible from far away.
-- Search by English or Chinese name, filter by "will be empty / will be full / biggest drops / biggest gains", and click a station for a card with now → in 1 hour and the three biggest reasons for the forecast.
-- Light and dark mode, works on phones.
-- Data: `docs/data/stations.json` and `docs/data/forecast.json`, written by `web/make_forecast.py` inside the collector job after every snapshot, using the same feature code and model as training. The reasons are LightGBM's built-in SHAP values (`pred_contrib`), summed into seven groups. If this step fails, collection carries on.
+**Map page**
+- Each station is a bike pin when zoomed in, a dot when zoomed out. Colour = what to expect in one hour: green (bikes available, 6+), orange (only a few, 3–5), red (no bikes, ≤ 2), blue (no parking, ≤ 2 free docks).
+- Find a station three ways: an area dropdown (all 42 districts), a search box with suggestions while typing (English or Chinese, e.g. "MRT exit 5", "台大"), or "Near me" (browser location).
+- A summary for the chosen area ("In 1 hour: 516 stations with no bikes…"); clicking a line highlights only those stations.
+- Click a pin: pop-up with 1 hour ago / now / in 1 hour, a plain-language verdict and a link to the station page. Optional 3D view and dark mode.
+
+**Station page** (`station.html?id=<station number>`, shareable)
+- Verdict, 1 hour ago / now / in 1 hour, a chart of the last 2 hours with the forecast, "Why this forecast?" in plain sentences, and the 6 nearest stations with a small map.
+
+**Data:** `docs/data/stations.json` and `docs/data/forecast.json`, written by `web/make_forecast.py` inside the collector job after every snapshot, with the same feature code and model as training. Per station: bikes now, free docks, forecast, top 3 reasons (LightGBM's built-in SHAP values, `pred_contrib`, summed into seven groups) and the last 2 hours of counts. If this step fails, collection carries on.
 
 ## Analysis app (Streamlit)
 

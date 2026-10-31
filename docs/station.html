@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Station Forecast</title>
+<meta name="description" content="One-hour bike forecast for a YouBike station.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b9a66'/%3E%3Cg fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='19' cy='41' r='9'/%3E%3Ccircle cx='45' cy='41' r='9'/%3E%3Cpath d='M19 41l8-15h11l7 15M27 26l7 15M24 20h7'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+<link href="style.css" rel="stylesheet">
+<style>
+.top { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); }
+.top .in { max-width: 920px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 14px; align-items: center; }
+.top .sg-wrap { flex: 1; max-width: 440px; margin-left: auto; }
+.back { text-decoration: none; font-weight: 500; white-space: nowrap; }
+main { max-width: 920px; margin: 0 auto; padding: 22px 16px 40px; }
+.title h1 { margin: 0; font-size: 26px; letter-spacing: -0.01em; line-height: 1.2; }
+.title .zh { font-size: 17px; color: var(--ink-2); margin-top: 2px; }
+.title .meta { color: var(--ink-3); font-size: 13px; margin-top: 4px; }
+.verdict { margin: 18px 0 14px; padding: 14px 16px; border-radius: 14px; font-size: 16px; display: flex; gap: 12px; align-items: center; }
+.verdict .ic { font-size: 26px; }
+.verdict.nobikes { background: var(--nobikes-soft); } .verdict.noparking { background: var(--noparking-soft); }
+.verdict.few { background: var(--few-soft); } .verdict.ok { background: var(--ok-soft); }
+.times .v { font-size: 34px; }
+.grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-top: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; }
+.card h2 { margin: 0 0 4px; font-size: 15px; }
+.card .sub { color: var(--ink-3); font-size: 12.5px; margin-bottom: 10px; }
+svg.chart { width: 100%; height: auto; display: block; }
+svg.chart text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
+.why li { margin: 8px 0; display: flex; gap: 10px; align-items: baseline; }
+.why ul { list-style: none; padding: 0; margin: 0; }
+.why .arrow { font-weight: 700; width: 18px; flex: none; text-align: center; }
+.why .amt { margin-left: auto; color: var(--ink-3); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#mini { height: 230px; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.near a { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; padding: 8px 6px; border-radius: 8px; text-decoration: none; color: inherit; }
+.near a:hover { background: var(--soft); }
+.near .n { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.near .m { font-size: 12px; color: var(--ink-3); }
+.near .r { text-align: right; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.pin.me { width: 20px; height: 20px; outline: 3px solid var(--ink); }
+.note { color: var(--ink-3); font-size: 12.5px; margin-top: 22px; }
+.empty { padding: 60px 0; text-align: center; color: var(--ink-2); }
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+  .top .in { flex-wrap: wrap; } .top .sg-wrap { max-width: none; flex-basis: 100%; }
+  .times .v { font-size: 26px; } .title h1 { font-size: 21px; }
+}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">Loading…</div>
+<div class="top"><div class="in">
+  <a class="back" href="./">← Map</a>
+  <a class="brand" href="./"><svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#2b9a66"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><circle cx="19" cy="41" r="9"/><circle cx="45" cy="41" r="9"/><path d="M19 41l8-15h11l7 15M27 26l7 15M24 20h7"/></g></svg>
+    <div><h1 style="font-size:15px">Will there be a bike?</h1></div></a>
+  <div class="sg-wrap">
+    <input class="field" id="q" type="search" placeholder="Another station… (e.g. MRT exit 5, 台大)" autocomplete="off" aria-label="Search a station">
+    <ul class="sg" id="sg" hidden></ul>
+  </div>
+</div></div>
+
+<main id="main"></main>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="common.js"></script>
+<script>
+(() => {
+  const { STATUS, esc, fmtHM, fmtDay, fmtDist } = YB;
+  const $ = (id) => document.getElementById(id);
+  let D, mini;
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("yb-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+
+  function chart(s) {
+    const W = 600, H = 210, L = 34, R = 14, T = 14, B = 26;
+    const hs = D.meta.hist_slots.map(t => new Date(t).getTime());
+    const t0 = hs[0], t1 = new Date(D.meta.forecast_time).getTime(), tNow = new Date(D.meta.data_time).getTime();
+    const ymax = Math.max(s.cap, ...s.hist.filter(v => v != null), s.fc, 1);
+    const x = (t) => L + (W - L - R) * (t - t0) / (t1 - t0), y = (v) => T + (H - T - B) * (1 - v / ymax);
+    const pts = s.hist.map((v, i) => v == null ? null : [x(hs[i]), y(v)]).filter(Boolean);
+    const last = s.hist[s.hist.length - 1] ?? s.now, lastT = hs[hs.length - 1];
+    const col = STATUS[s.st].color;
+    let g = "";
+    for (const v of [0, Math.round(ymax / 2), ymax]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    for (let t = Math.ceil(t0 / 1800000) * 1800000; t <= t1; t += 1800000)
+      g += `<text x="${x(t)}" y="${H - 6}" text-anchor="middle">${fmtHM(new Date(t).toISOString())}</text>`;
+    g += `<line x1="${x(tNow)}" x2="${x(tNow)}" y1="${T}" y2="${H - B}" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text x="${x(tNow)}" y="${T + 10}" text-anchor="middle" style="fill:var(--ink-2)">now</text>`;
+    g += `<rect x="${x(tNow)}" y="${T}" width="${x(t1) - x(tNow)}" height="${H - T - B}" fill="var(--soft)" opacity=".6"/>`;
+    if (pts.length > 1) g += `<polyline points="${pts.map(p => p.join(",")).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    g += pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="var(--ink)"/>`).join("");
+    g += `<line x1="${x(lastT)}" y1="${y(last)}" x2="${x(t1)}" y2="${y(s.fc)}" stroke="${col}" stroke-width="2.5" stroke-dasharray="6 5"/>`;
+    g += `<circle cx="${x(t1)}" cy="${y(s.fc)}" r="7" fill="${col}" stroke="var(--panel)" stroke-width="2"/>`;
+    g += `<text x="${x(t1) - 10}" y="${y(s.fc) - 12}" text-anchor="end" style="fill:${col};font-weight:700;font-size:13px">~${Math.round(s.fc)}</text>`;
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Bikes over the last two hours and the forecast">${g}</svg>`;
+  }
+
+  function render(s) {
+    document.title = `${s.en} · Station Forecast`;
+    const hs = D.meta.hist_slots, ago = hs.length >= 7 ? hs[hs.length - 7] : null;
+    const box = (k, v, cls, t) => `<div class="tbox ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="u">${t}</div></div>`;
+    const why = YB.whySentences(s).map(w => `<li><span class="arrow" style="color:${w.v < 0 ? "var(--nobikes)" : w.v > 0 ? "var(--ok)" : "var(--ink-3)"}">${w.v < 0 ? "↓" : w.v > 0 ? "↑" : "–"}</span>
+      <span>${esc(w.text)}</span><span class="amt">${w.v ? (w.v > 0 ? "+" : "") + w.v.toFixed(1) + " bikes" : ""}</span></li>`).join("");
+    const near = YB.nearest(D.stations, s, 6, s.id);
+    const nearHTML = near.map(({ s: n, d }) => `<a href="station.html?id=${encodeURIComponent(n.id)}">
+      <span class="dot ${n.st}"></span><span style="min-width:0"><div class="n">${esc(n.en)}</div><div class="m">${fmtDist(d)} · ${esc(n.zh)}</div></span>
+      <span class="r">${n.now} → <b>${Math.round(n.fc)}</b><br><span class="tag ${n.st}">${STATUS[n.st].short}</span></span></a>`).join("");
+    const better = near.filter(n => n.s.st === "ok" && n.d < 600);
+    const tipNo = s.st === "nobikes" || s.st === "few"
+      ? (better.length ? `Closest station likely to have bikes: <b>${esc(better[0].s.en)}</b>, ${fmtDist(better[0].d)} away.` : "No nearby station within 600 m is clearly better.")
+      : s.st === "noparking" ? "Look below for a nearby station with free docks." : "";
+
+    $("main").innerHTML = `
+      <div class="title"><h1>${esc(s.en)}</h1><div class="zh">${esc(s.zh)}</div>
+        <div class="meta">${esc(s.d)} · ${s.city === "taipei" ? "Taipei City" : "New Taipei City"} · ${s.cap} docks · station ${esc(s.id)}</div></div>
+      <div class="verdict ${s.st}"><span class="ic">${STATUS[s.st].icon}</span><div>${STATUS[s.st].verdict}${tipNo ? `<div style="font-size:13.5px;color:var(--ink-2);margin-top:4px">${tipNo}</div>` : ""}</div></div>
+      <div class="times">
+        ${box("1 hour ago", s.ago ?? "–", "", ago ? fmtHM(ago) : "")}
+        ${box("Now", s.now, s.stNow, fmtHM(D.meta.data_time) + " · bikes")}
+        ${box("In 1 hour", "~" + Math.round(s.fc), s.st, fmtHM(D.meta.forecast_time) + " · " + STATUS[s.st].short.toLowerCase())}
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Last 2 hours and the next hour</h2><div class="sub">Bikes at this station. Dashed = forecast.</div>${chart(s)}</div>
+        <div class="card why"><h2>Why this forecast?</h2><div class="sub">What the model sees for the next hour</div><ul>${why}</ul></div>
+      </div>
+      <div class="card near" style="margin-top:14px"><h2>Nearby stations</h2><div class="sub">Forecast for ${fmtHM(D.meta.forecast_time)}</div>
+        <div id="mini"></div>${nearHTML}</div>
+      <div class="note">Updated ${fmtDay(D.meta.data_time)}. Forecast by a machine-learning model trained on data collected since 30 Oct 2026, so treat it as an estimate. Free docks now: ${s.docks ?? "–"}.</div>`;
+
+    if (mini) mini.remove();
+    mini = new maplibregl.Map({ container: "mini", center: [s.lon, s.lat], zoom: 15.2, attributionControl: { compact: true },
+      style: isDark() ? "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" : "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json" });
+    for (const n of [{ s }, ...near]) {
+      const el = document.createElement("div");
+      el.className = "pin" + (n.s.id === s.id ? " me" : ""); el.style.background = STATUS[n.s.st].color;
+      el.title = `${n.s.en}: ~${Math.round(n.s.fc)} bikes in 1 h`;
+      if (n.s.id !== s.id) { el.style.cursor = "pointer"; el.onclick = () => location.href = "station.html?id=" + encodeURIComponent(n.s.id); }
+      new maplibregl.Marker({ element: el }).setLngLat([n.s.lon, n.s.lat]).addTo(mini);
+    }
+    const bounds = new maplibregl.LngLatBounds();
+    [s, ...near.map(n => n.s)].forEach(p => bounds.extend([p.lon, p.lat]));
+    mini.fitBounds(bounds, { padding: 30, maxZoom: 16, duration: 0 });
+  }
+
+  YB.loadData().then(d => {
+    D = d;
+    const id = new URLSearchParams(location.search).get("id");
+    YB.attachSearch($("q"), $("sg"), () => D.stations, (s) => { location.href = "station.html?id=" + encodeURIComponent(s.id); });
+    if (id && D.byId[id]) render(D.byId[id]);
+    else $("main").innerHTML = `<div class="empty"><h2>Pick a station</h2><p>Use the search box above, or go back to the <a href="./">map</a>.</p></div>`;
+    $("loading").remove();
+  }).catch(err => { $("loading").textContent = "Could not load the forecast. Please try again in a minute."; console.error(err); });
+})();
+</script>
+</body>
+</html>
