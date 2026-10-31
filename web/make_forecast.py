@@ -9,7 +9,8 @@ model, so the website shows exactly what the model predicts.
 
 Outputs (docs/data/):
     stations.json   static station info (only changes when stations change)
-    forecast.json   per station: [bikes now, free docks, forecast +1 h, top 3 reasons, last 2 h of counts]
+    forecast.json   per station: [bikes now, free docks, forecast +1 h, top 3 reasons, last 2 h of counts,
+                                  P(empty in 1 h), P(full in 1 h)]
 """
 
 import json
@@ -78,6 +79,17 @@ def main():
     contrib = model.predict(X, pred_contrib=True)[:, :-1]          # per-feature effect on the change, in bikes
     cap = feats["capacity"].to_numpy()
     fc = np.clip(feats["bikes_now"].to_numpy() + change, 0, cap)
+    # night rule: at night "same as now" beats the model in validation (docs/MODEL.md)
+    night = feats["target_hour"].astype(int).isin(meta.get("night_hours", [])).to_numpy()
+    fc = np.where(night, feats["bikes_now"].to_numpy(), fc)
+
+    # warning models: probability that the station is empty / full in one hour
+    probs = {}
+    for kind in ("empty", "full"):
+        path = ROOT / "models" / f"alert_{kind}.txt"
+        if path.exists():
+            m = lgb.Booster(model_str=path.read_bytes().decode("utf-8").replace("\r\n", "\n"))
+            probs[kind] = m.predict(X)
 
     idx = {f: i for i, f in enumerate(meta["features"])}
     group_vals = np.column_stack([contrib[:, [idx[f] for f in cols if f in idx]].sum(axis=1)
@@ -106,6 +118,8 @@ def main():
             [[int(g), round(float(group_vals[i, g]), 1)] for g in top],
             [None if pd.isna(v) else int(v) for v in
              (hist.loc[sid].to_numpy() if sid in hist.index else [np.nan] * len(hist_slots))],
+            round(float(probs["empty"][i]), 2) if "empty" in probs else None,
+            round(float(probs["full"][i]), 2) if "full" in probs else None,
         ]
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -122,6 +136,7 @@ def main():
         "reasons": [name for name, _ in REASONS],
         "hist_slots": [t.isoformat(timespec="minutes") for t in hist_slots],
         "low": LOW,
+        "alert_thresholds": meta.get("alert_thresholds", {}) if probs else {},
         "s": forecast,
     }
     (OUT / "forecast.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

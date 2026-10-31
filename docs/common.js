@@ -15,8 +15,16 @@
   };
   const ORDER = ["nobikes", "noparking", "few", "ok"];
 
-  function status(bikes, usable) {
+  // pE / pF: probabilities from the warning models (empty / full in one hour), with their thresholds.
+  // Without them (older files, or "now"), the count alone decides.
+  function status(bikes, usable, pE = null, pF = null, thr = null) {
     const r = Math.round(bikes);
+    if (thr && pE != null) {
+      if (pE >= thr.empty) return "nobikes";
+      if (pF != null && pF >= thr.full) return "noparking";
+      if (r <= 5) return "few";
+      return "ok";
+    }
     if (r <= 2) return "nobikes";
     if (usable - r <= 2) return "noparking";
     if (r <= 5) return "few";
@@ -56,7 +64,9 @@
       s.now = f[0]; s.docks = f[1]; s.fc = f[2]; s.why = f[3] || []; s.hist = f[4] || [];
       s.usable = s.docks == null ? s.cap : s.now + s.docks;
       s.change = s.fc - s.now;
-      s.st = status(s.fc, s.usable);
+      s.pE = f[5] ?? null; s.pF = f[6] ?? null;
+      const thr = fc.alert_thresholds && fc.alert_thresholds.empty != null ? fc.alert_thresholds : null;
+      s.st = status(s.fc, s.usable, s.pE, s.pF, thr);
       s.stNow = status(s.now, s.usable);
       // bikes one hour ago = 6 slots before the last history point
       const h = s.hist, i = h.length - 7;

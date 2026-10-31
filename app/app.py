@@ -79,7 +79,10 @@ def model_input(meta, X: pd.DataFrame) -> pd.DataFrame:
 
 def predict(model, meta, X: pd.DataFrame) -> np.ndarray:
     change = model.predict(model_input(meta, X))
-    return np.clip(X["bikes_now"].values + change, 0, X["capacity"].values)
+    pred = np.clip(X["bikes_now"].values + change, 0, X["capacity"].values)
+    # night rule: at night "same as now" beats the model in validation (docs/MODEL.md)
+    night = X["target_hour"].astype(int).isin(meta.get("night_hours", [])).to_numpy()
+    return np.where(night, X["bikes_now"].values, pred)
 
 
 def reasons(model, meta, row: pd.DataFrame) -> pd.DataFrame:

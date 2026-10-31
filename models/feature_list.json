@@ -82,5 +82,18 @@
       "Zhongshan",
       "Zhongzheng"
     ]
+  },
+  "night_hours": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "low": 2,
+  "alert_thresholds": {
+    "empty": 0.35,
+    "full": 0.3
   }
 }

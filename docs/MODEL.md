@@ -33,6 +33,16 @@ Two details that matter for honesty:
 - The target is never filled in. If the station has no reading at `t + 60`, the row is not used for training or testing. Features may carry the last value forward over a gap of up to 20 minutes (a late GitHub run), the target may not.
 - Future weather comes from the forecast that existed at time `t`, not from what actually happened. In real use the actual weather of the next hour isn't known yet.
 
+## Methods compared
+
+Baselines: same as now, same time yesterday, same time last week, historical average (below).
+Models: linear regression, random forest (sampled to 200k rows), LightGBM, and LightGBM with a night rule.
+Warning models: two LightGBM classifiers, "empty in one hour" (≤ 2 bikes) and "full in one hour" (≤ 2 free docks). Each threshold is picked on the last 20% of the *training* period (best F1), never on the test day.
+
+Night rule: for target hours 00:00–05:59 the forecast is "same as now". In validation the model was slightly worse than "same as now" at night (almost nothing moves), so this is a measured choice, not a guess.
+
+Extra score: the NTU score (from the NTU Machine Learning 2023 YouBike task) weights each error by how close the station is to empty or full, so mistakes at empty/full stations count up to 3× more.
+
 ## Baselines
 
 | baseline | prediction |
@@ -98,4 +108,36 @@ Limits of this analysis:
 
 ## Results
 
-To be filled in after the final run on the complete data (planned 8 Nov 2026).
+### First fair test (1 Nov 2026): trained on Friday 30 Oct, tested on all of Saturday 31 Oct
+
+474,000 test forecasts. The model never saw a weekend before this test.
+
+| method | MAE (bikes) | within 2 bikes | NTU score | vs "same as now" |
+|---|---|---|---|---|
+| same as now (baseline) | 2.74 | 64% | 0.169 | – |
+| same time yesterday | 5.65 | 39% | 0.338 | −106% |
+| linear regression | 2.96 | 49% | 0.198 | −8% |
+| random forest | 2.79 | 53% | 0.189 | −2% |
+| LightGBM | 2.64 | 58% | 0.170 | +3.7% |
+| **LightGBM + night rule** | **2.62** | 59% | **0.168** | **+4.5%** |
+
+("Same time last week" and "historical average" fall back to "same as now" here: there is no week-old data yet, and the training day had no weekend.)
+
+Warnings (did we warn about stations that really ran empty / full one hour later?):
+
+| | empty: caught | empty: alarm right | full: caught | full: alarm right |
+|---|---|---|---|---|
+| same as now | 63% | 62% | 55% | 56% |
+| LightGBM count forecast | 50% | 68% | 32% | 78% |
+| **warning models** (AUC 0.90 empty, 0.94 full) | **80%** | 53% | **57%** | 51% |
+
+The warning models catch far more stations that run empty, at the cost of more false alarms. For a rider, a missed warning (walking to an empty station) costs more than a false one, so the website uses them.
+
+### Live check of the published forecasts (31 Oct 07:50 – 1 Nov 03:30)
+
+Every forecast the website showed, compared with the real count one hour later (389,000 forecasts, model trained on Friday only):
+- the website's "now" and "1 hour ago" matched the saved official data in 100% of cases;
+- MAE 2.78 vs 2.90 for "same as now" (4% better); for stations that really changed by 3+ bikes, 5.41 vs 6.21 (13% better);
+- better than "same as now" in every hour from 07:00 to 23:00, slightly worse from 00:00 to 04:00, which led to the night rule.
+
+These are early results from one day of training. The full day-by-day validation runs on the complete data (planned 8 Nov 2026).
