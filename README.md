@@ -39,7 +39,7 @@ How it handles failures:
 - files are written to a temp name and then renamed, so there are no half-written files
 - every attempt, failed or not, is logged in the manifest, so gaps are measurable later
 - a run where any source failed shows red in the Actions tab, but whatever succeeded is still committed
-- only one collector runs at a time (`concurrency` group), and pushes retry on conflict
+- only one collector runs at a time (`concurrency` group); if a push clashes with another change to the same file, the collector keeps its own newer version (`git pull --rebase -X theirs`), and a failed sync is undone before the next snapshot, so one clash can't block a whole job (this happened once, on 31 Oct 13:00–13:20, and cost 3 snapshots)
 - each snapshot is pushed as soon as it is taken, so a crashed job loses at most one snapshot
 
 Keeping the raw data untouched means the clean dataset can always be rebuilt from scratch, and a parsing bug never loses data.

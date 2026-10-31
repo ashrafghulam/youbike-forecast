@@ -45,15 +45,20 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           end=$(( $(date +%s) + 330 * 60 ))
           while [ "$(date +%s)" -lt "$end" ]; do
+            git rebase --abort 2>/dev/null || true      # never stay stuck in a half-finished sync
             python collector/collect.py || echo "::warning::a source failed at $(date -u +%H:%M)Z (see manifest)"
             # refresh the website forecast; never allowed to stop collection
             timeout 240 python web/make_forecast.py || echo "::warning::website forecast not updated at $(date -u +%H:%M)Z"
             git add data/ docs/data/
             if ! git diff --cached --quiet; then
               git commit -q -m "data: snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+              # If someone else changed the same file (e.g. docs/data/forecast.json), keep the
+              # collector's newer version (-X theirs). A failed sync is undone so the next
+              # loop starts clean; unpushed snapshots are pushed with the next one.
               for i in 1 2 3 4 5; do
-                git pull -q --rebase && git push -q && break
-                echo "push failed, retry $i"; sleep $((i * 5))
+                if git pull -q --rebase -X theirs && git push -q; then break; fi
+                git rebase --abort 2>/dev/null || true
+                echo "::warning::push failed, retry $i"; sleep $((i * 5))
               done
             fi
             # sleep until the next 10-minute mark
