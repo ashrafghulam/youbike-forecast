@@ -77,6 +77,7 @@ svg.chart text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
   const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 
   function chart(s) {
+    if (!D.meta.hist_slots.length) return `<p style="color:var(--ink-3)">History will appear with the next update.</p>`;
     const W = 600, H = 210, L = 34, R = 14, T = 14, B = 26;
     const hs = D.meta.hist_slots.map(t => new Date(t).getTime());
     const t0 = hs[0], t1 = new Date(D.meta.forecast_time).getTime(), tNow = new Date(D.meta.data_time).getTime();

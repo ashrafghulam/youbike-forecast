@@ -48,6 +48,7 @@
   // Load stations + forecast and join them into one list of station objects.
   async function loadData() {
     const [st, fc] = await Promise.all([getJSON("stations.json"), getJSON("forecast.json")]);
+    fc.hist_slots = fc.hist_slots || [];          // older files had no history
     const list = [];
     for (const s of st.stations) {
       const f = fc.s[s.id];
