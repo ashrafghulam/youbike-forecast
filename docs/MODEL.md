@@ -108,6 +108,37 @@ Limits of this analysis:
 
 ## Results
 
+### Day-by-day validation (2 Nov 2026): trained on Fri 30 + Sat 31 Oct, tested on all of Sun 1 Nov
+
+487,000 test forecasts on a day the models never saw.
+
+| method | MAE (bikes) | within 2 bikes | NTU score | vs "same as now" |
+|---|---|---|---|---|
+| same as now (baseline) | 2.69 | 65% | 0.164 | – |
+| same time yesterday | 5.66 | 36% | 0.343 | −111% |
+| historical average (station × hour × weekend) | 5.44 | 34% | 0.330 | −102% |
+| linear regression | 2.77 | 53% | 0.185 | −3% |
+| random forest | 2.75 | 53% | 0.186 | −2% |
+| LightGBM | 2.57 | 58% | 0.164 | +4.5% |
+| **LightGBM + night rule** | **2.56** | 59% | **0.163** | **+4.9%** |
+
+("Same time last week" still falls back to "same as now": there is no week-old data yet.)
+
+By hour of day, LightGBM beats "same as now" in every hour from 06:00 to 23:00 (largest gain at 18:00: 3.77 vs 4.13 bikes) and is slightly worse at 00:00 and 02:00–05:00, which is what the night rule covers.
+
+Warnings, one hour ahead:
+
+| | empty: caught | empty: alarm right | full: caught | full: alarm right |
+|---|---|---|---|---|
+| same as now | 63% | 63% | 59% | 59% |
+| LightGBM count forecast | 50% | 70% | 40% | 77% |
+| **warning models** (AUC 0.91 empty, 0.95 full) | **75%** | 58% | **64%** | 55% |
+
+What this says:
+- Only LightGBM beats the naive baseline; linear regression and random forest do not. The forecast-of-change approach plus neighbours and recent trend is what helps.
+- Methods that ignore the current count (yesterday, historical average) are far worse one hour ahead. The current count carries most of the information.
+- The gain over the baseline is modest (about 5%) but consistent across the day, and largest at rush hours, which is when riders need it.
+
 ### First fair test (1 Nov 2026): trained on Friday 30 Oct, tested on all of Saturday 31 Oct
 
 474,000 test forecasts. The model never saw a weekend before this test.
@@ -140,4 +171,4 @@ Every forecast the website showed, compared with the real count one hour later (
 - MAE 2.78 vs 2.90 for "same as now" (4% better); for stations that really changed by 3+ bikes, 5.41 vs 6.21 (13% better);
 - better than "same as now" in every hour from 07:00 to 23:00, slightly worse from 00:00 to 04:00, which led to the night rule.
 
-These are early results from one day of training. The full day-by-day validation runs on the complete data (planned 8 Nov 2026).
+The final validation, with one fold per day over the full collection period, is planned for 8 Nov 2026.
