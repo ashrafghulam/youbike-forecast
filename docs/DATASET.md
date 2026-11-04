@@ -25,7 +25,7 @@ The collector takes a snapshot of all three every 10 minutes (see the README for
 
 - File names in `data/raw/` use **UTC** fetch time, e.g. `20261029T184948Z.json.gz`.
 - Every timestamp in the processed tables is **Asia/Taipei** time and timezone-aware.
-- `slot` is the fetch time rounded **down** to 10 minutes. It is the time index used for modelling. A row in slot 08:10 means "what the station looked like at some point between 08:10 and 08:20".
+- `slot` is the fetch time rounded to the **nearest** 10 minutes. It is the time index used for modelling. Fetches normally happen within a minute after the mark, so a row in slot 08:10 is usually the station at 08:10–08:11. The exact time is kept in `fetched_at`.
 
 ## Tables
 
@@ -89,10 +89,20 @@ Other steps:
 ## Known issues
 
 - **bikes + docks is often less than capacity.** In the first snapshot this was true for ~47% of stations. It is normal for YouBike: docks can be broken or locked, and bikes can be under repair. It is kept as `unavailable` and not treated as an error.
-- **Scheduled runs can start late.** GitHub Actions doesn't guarantee exact timing, so some slots will be empty and the gap between two snapshots is not always exactly 10 minutes. `quality_report.md` lists every missing slot.
+- **Scheduled runs can start late or be stopped.** GitHub Actions doesn't guarantee exact timing, so some slots can be empty. `quality_report.md` lists every missing slot; the known gaps are explained below.
 - **Station list changes.** Stations can be added, removed or renamed during collection. `first_seen` and `last_seen` show this.
 - **New Taipei numbers arrive as text** in the API and are converted to numbers. A value that fails to convert becomes empty.
 - **No history before 30 Oct 2026.** The dataset only covers the collection period, so it contains no holidays and only a small range of weather.
+
+## Known gaps
+
+Missing 10-minute slots (Taipei time) and why. Missing slots are never filled in: features may carry the last value forward for up to 20 minutes, but a missing target is dropped, not guessed.
+
+| slots | cause | effect |
+|---|---|---|
+| 30 Oct 03:10, 03:30 | First hour of collection. The first snapshots were started by hand at irregular times (02:49, 02:57, 03:19, 03:38) before the 10-minute loop took over at 03:40. | none on modelling; the first day starts at 02:50 |
+| 31 Oct 13:00–13:20 | A manual change was pushed to the repository while the collector was pushing. The collector's sync failed and three snapshots were not saved. Fixed the same day: a failed sync is now undone and retried, and snapshots that weren't pushed go out with the next one. | 3 slots lost |
+| (4 Nov 02:20, fixed) | GitHub stopped a collector run at 02:17, about 3 minutes before its planned end. The run's last step started the next run straight away, and it took its first snapshot at 02:19:20. Earlier versions of the builder rounded times down and filed it under 02:10; it now goes to 02:20. | no data lost |
 
 ## Quality report
 

@@ -120,7 +120,9 @@ def load_snapshots(raw: Path) -> tuple[pd.DataFrame, list[str]]:
 
 def clean_snapshots(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["station_id", "bikes", "capacity"]).copy()
-    df["slot"] = df["fetched_at"].dt.floor(SLOT)
+    # Each fetch goes to the nearest 10-minute mark. A run that starts a little early
+    # (e.g. 02:19:20 after a restart) belongs to 02:20, not 02:10. The exact time stays in fetched_at.
+    df["slot"] = df["fetched_at"].dt.round(SLOT)
 
     # If two fetches land in the same slot (e.g. a manual run), keep the later one.
     df = df.sort_values("fetched_at").drop_duplicates(["station_id", "slot"], keep="last")

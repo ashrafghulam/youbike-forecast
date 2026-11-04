@@ -91,7 +91,8 @@ def weather_features(slots: pd.DatetimeIndex, points, obs: pd.DataFrame, fc: pd.
             "temperature_2m"]].rename(columns={
         "valid_time": "target_hour", "precipitation": "fc_precip_1h",
         "precipitation_probability": "fc_precip_prob_1h", "temperature_2m": "fc_temp_1h"})
-    f["issued_slot"] = f["issued_at"].dt.floor(f"{SLOT_MIN}min")
+    # same rule as the snapshot slots (nearest 10 minutes), so a forecast belongs to the snapshot it was fetched with
+    f["issued_slot"] = f["issued_at"].dt.round(f"{SLOT_MIN}min")
     grid = pd.merge_asof(grid, f.drop(columns="issued_at").sort_values("issued_slot"), left_on="slot",
                          right_on="issued_slot", by=["weather_point", "target_hour"], direction="backward",
                          tolerance=pd.Timedelta("60min"))
