@@ -101,7 +101,8 @@ def predict(model: lgb.Booster, df: pd.DataFrame, night_rule: bool = False) -> n
 
 def linear_forecast(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
     med = train[NUMERIC].median().fillna(0)          # columns with no data yet (e.g. last week) -> 0
-    lr = LinearRegression().fit(train[NUMERIC].fillna(med), train["y"] - train["bikes_now"])
+    # copy_X=False: the filled copy is only used here, so it can be centred in place (same result, less memory)
+    lr = LinearRegression(copy_X=False).fit(train[NUMERIC].fillna(med), train["y"] - train["bikes_now"])
     return np.clip(test["bikes_now"].values + lr.predict(test[NUMERIC].fillna(med)), 0, test["capacity"].values)
 
 
@@ -272,7 +273,11 @@ def main():
     args.models.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_parquet(args.features)
-    df["station_id"] = df["station_id"].astype("category")   # saves memory; not a model input
+    # Memory: 32-bit numbers are plenty for counts, coordinates (~1 m) and weather, and halve
+    # the size of every copy the models make. station_id is not a model input.
+    df["station_id"] = df["station_id"].astype("category")
+    wide = [c for c in NUMERIC if df[c].dtype in ("float64", "int64")]
+    df[wide] = df[wide].astype("float32")
     if not args.no_cv:
         print("validation (one fold per test day):")
         folds, by_hour, aucs = cross_validate(df, args.min_train_days)
@@ -286,6 +291,7 @@ def main():
         print("\nalert models:")
         print(aucs.round(3).to_string(index=False))
 
+    gc.collect()
     # final models on everything, for the website, the app and the driver analysis
     full = df[df["y"].notna() & df["bikes_now"].notna()]
     model = train_model(full)
