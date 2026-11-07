@@ -91,7 +91,8 @@ html, body { height: 100%; overflow: hidden; }
       <svg width="36" height="36" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#2b9a66"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><circle cx="19" cy="41" r="9"/><circle cx="45" cy="41" r="9"/><path d="M19 41l8-15h11l7 15M27 26l7 15M24 20h7"/></g></svg>
       <div><h1>Will there be a bike?</h1><small>YouBike one-hour forecast · 微笑單車一小時預測</small></div>
     </a>
-    <div class="p-time"><span class="live"></span>Updated <b id="tData">–</b> · forecast for <b id="tFc">–</b></div>
+    <div class="p-time"><span class="live" id="liveDot"></span><span id="tLabel">Updated</span> <b id="tData">–</b> · forecast for <b id="tFc">–</b></div>
+    <div class="p-time" id="tArchive" hidden>Data collection ended on 8 Nov 2026. This is the last forecast that was made.</div>
   </div>
 
   <div class="p-ctrl">
@@ -130,7 +131,7 @@ html, body { height: 100%; overflow: hidden; }
     <li><span class="dot noparking"></span> <b>No parking soon</b>: 2 or fewer free docks expected</li>
   </ul>
   <p>The model looks at the bikes there now, how that changed in the last hour, the same time yesterday, nearby stations, the time of day, the location and the weather forecast.</p>
-  <p>Data collection started on 30 Oct 2026, so the model has only seen a few days. Treat forecasts as a helpful estimate, not a guarantee.</p>
+  <p>Data was collected from 30 Oct to 8 Nov 2026, so the model has seen 9 days of autumn weather. Treat forecasts as a helpful estimate, not a guarantee.</p>
   <p style="text-align:right"><button class="btn" id="aboutClose">Close</button></p>
 </div></div>
 
@@ -325,6 +326,12 @@ html, body { height: 100%; overflow: hidden; }
     const d = await YB.loadData();
     S.all = d.stations; S.byId = d.byId; S.meta = d.meta;
     $("tData").textContent = fmtDay(d.meta.data_time); $("tFc").textContent = fmtHM(d.meta.forecast_time);
+    // more than an hour old: collection has stopped, say so instead of showing it as live
+    const old = Date.now() - new Date(d.meta.data_time).getTime() > 60 * 60 * 1000;
+    $("tArchive").hidden = !old; $("liveDot").classList.toggle("off", old);
+    $("tLabel").textContent = old ? "Last update" : "Updated";
+    if (old) $("tData").textContent = new Date(d.meta.data_time).toLocaleString("en-GB",
+      { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
     if (first) { fillAreas(); YB.attachSearch($("q"), $("sg"), () => S.all, focusStation); }
     if (S.sel) S.sel = S.byId[S.sel.id] || null;
     renderSummary(); renderList(); draw();

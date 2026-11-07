@@ -2,6 +2,7 @@
 Build clean tables from the raw snapshot history.
 
     python pipeline/build_dataset.py            # reads data/raw, writes data/processed
+    python pipeline/build_dataset.py --end none # keep every snapshot, including the last partial day
 
 Nothing in data/raw is ever changed. Delete data/processed and run this again
 to get exactly the same tables back.
@@ -27,6 +28,9 @@ ROOT = Path(__file__).resolve().parent.parent
 TZ = "Asia/Taipei"
 SLOT = "10min"          # the collector runs every 10 minutes
 STALE_MINUTES = 30      # station reading older than this at fetch time is flagged
+# Collection ran from 30 Oct 2026 02:49 to 8 Nov 2026 01:20 (Taipei). The analysis uses the
+# 9 full days up to midnight; the 80 minutes of 8 Nov are kept in data/raw but left out here.
+ANALYSIS_END = "2026-11-08"
 
 # Weather grid used by the collector (one point per ~10 km cell with stations).
 WEATHER_GRID = json.loads((ROOT / "collector" / "weather_points.json").read_text())
@@ -271,13 +275,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", type=Path, default=ROOT / "data" / "raw")
     ap.add_argument("--out", type=Path, default=ROOT / "data" / "processed")
+    ap.add_argument("--end", default=ANALYSIS_END,
+                    help="keep data before this date/time (Taipei time); 'none' keeps everything")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    end = None if str(args.end).lower() == "none" else pd.Timestamp(args.end, tz=TZ)
 
     raw_snap, bad1 = load_snapshots(args.raw)
+    obs, fc, bad2 = load_weather(args.raw)
+    if end is not None:
+        raw_snap = raw_snap[raw_snap["fetched_at"] < end]
+        obs, fc = obs[obs["time"] < end], fc[fc["issued_at"] < end]
     stations = build_stations(raw_snap)
     snap = clean_snapshots(raw_snap)
-    obs, fc, bad2 = load_weather(args.raw)
+    if end is not None:
+        snap = snap[snap["slot"] < end].reset_index(drop=True)
 
     snap.to_parquet(args.out / "snapshots.parquet", index=False)
     stations.to_parquet(args.out / "stations.parquet", index=False)

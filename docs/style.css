@@ -31,6 +31,7 @@ button, select, input { font: inherit; color: inherit; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
 .brand h1 { font-size: 17px; margin: 0; letter-spacing: -0.01em; }
 .brand small { display: block; color: var(--ink-3); font-size: 12px; }
+.live.off { background: #9a9890; box-shadow: none; }
 .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2b9a66; box-shadow: 0 0 0 3px rgba(43,154,102,.2); margin-right: 6px; }
 
 .field { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); outline: none; }

@@ -130,7 +130,7 @@ svg.chart text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
       </div>
       <div class="card near" style="margin-top:14px"><h2>Nearby stations</h2><div class="sub">Forecast for ${fmtHM(D.meta.forecast_time)}</div>
         <div id="mini"></div>${nearHTML}</div>
-      <div class="note">Updated ${fmtDay(D.meta.data_time)}. Forecast by a machine-learning model trained on data collected since 30 Oct 2026, so treat it as an estimate. Free docks now: ${s.docks ?? "–"}.</div>`;
+      <div class="note">Updated ${fmtDay(D.meta.data_time)}. Forecast by a machine-learning model trained on data collected from 30 Oct to 8 Nov 2026, so treat it as an estimate. Free docks now: ${s.docks ?? "–"}.</div>`;
 
     if (mini) mini.remove();
     mini = new maplibregl.Map({ container: "mini", center: [s.lon, s.lat], zoom: 15.2, attributionControl: { compact: true },
