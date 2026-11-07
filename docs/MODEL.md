@@ -59,7 +59,7 @@ When a baseline has no value (for example "last week" during the first 7 days), 
 LightGBM gradient boosting, one model for all stations.
 
 - It predicts the **change** from now (`y - bikes_now`), and the forecast is `bikes_now + change`, clipped to `[0, capacity]`. Most of the information is in the current count, so learning the change is easier and keeps forecasts sensible.
-- Absolute-error (L1) loss, because the main metric is MAE and most stations barely change in an hour, so the median change is a better target than the mean. On the first day (trained on 02:00–10:00, tested on 11:00–13:50) L1 gave MAE 2.77, squared error 2.88 (persistence 2.88). This is a single small check and will be confirmed by the full day-by-day validation.
+- Absolute-error (L1) loss, because the main metric is MAE and most stations barely change in an hour, so the median change is a better target than the mean. On the first day (trained on 02:00–10:00, tested on 11:00–13:50) L1 gave MAE 2.77, squared error 2.88 (persistence 2.88). This was a single small check; squared error was not re-tested in the final validation.
 - Fixed settings and a fixed 500 trees. Nothing is tuned on the test days.
 
 ## Validation
@@ -108,67 +108,76 @@ Limits of this analysis:
 
 ## Results
 
-### Day-by-day validation (2 Nov 2026): trained on Fri 30 + Sat 31 Oct, tested on all of Sun 1 Nov
+### Final validation: 7 test days, 1–7 Nov 2026
 
-487,000 test forecasts on a day the models never saw.
+Data: 30 Oct 02:50 to 7 Nov 23:50 (9 days, see [DATASET.md](DATASET.md)). Each test day is predicted by models trained only on the days before it (2 days for the first fold, 8 for the last), with the purge gap described above. 3.4 million test forecasts in total. Reproduce with `python pipeline/train.py`; the numbers are in `reports/cv_folds.csv`, `reports/cv_summary.json`, `reports/cv_by_hour.csv` and `reports/cv_alert_auc.csv`.
 
-| method | MAE (bikes) | within 2 bikes | NTU score | vs "same as now" |
+**All methods, averaged over the 7 test days**
+
+| method | MAE (bikes) | RMSE | within 2 bikes | NTU score | vs "same as now" |
+|---|---|---|---|---|---|
+| same as now (baseline) | 2.81 | 4.94 | 65% | 0.174 | – |
+| same time yesterday | 5.18 | 7.62 | 39% | 0.317 | −84% |
+| same time last week ¹ | 3.40 | 5.61 | 59% | 0.210 | −21% |
+| historical average (station × hour × weekend) | 4.47 | 6.52 | 37% | 0.280 | −59% |
+| linear regression | 2.82 | 4.40 | 54% | 0.189 | −0.4% |
+| random forest | 2.63 | 4.19 | 57% | 0.179 | +6.3% |
+| LightGBM | 2.48 | 4.16 | 61% | 0.160 | +11.8% |
+| **LightGBM + night rule** | **2.48** | 4.18 | **62%** | **0.159** | **+11.9%** |
+
+¹ A week of history exists only from Fri 6 Nov. On the 5 earlier test days this baseline falls back to "same as now". On the two days where it is real it is far worse than "same as now": 4.47 and 5.43 against 2.91 and 2.76.
+
+**By test day** (MAE in bikes)
+
+| test day | trained on | same as now | LightGBM + night rule | gain |
 |---|---|---|---|---|
-| same as now (baseline) | 2.69 | 65% | 0.164 | – |
-| same time yesterday | 5.66 | 36% | 0.343 | −111% |
-| historical average (station × hour × weekend) | 5.44 | 34% | 0.330 | −102% |
-| linear regression | 2.77 | 53% | 0.185 | −3% |
-| random forest | 2.75 | 53% | 0.186 | −2% |
-| LightGBM | 2.57 | 58% | 0.164 | +4.5% |
-| **LightGBM + night rule** | **2.56** | 59% | **0.163** | **+4.9%** |
+| Sun 1 Nov | 2 days | 2.69 | 2.56 | +4.8% |
+| Mon 2 Nov | 3 days | 2.68 | 2.52 | +5.8% |
+| Tue 3 Nov | 4 days | 2.87 | 2.55 | +11.2% |
+| Wed 4 Nov | 5 days | 2.88 | 2.40 | +16.7% |
+| Thu 5 Nov | 6 days | 2.89 | 2.38 | +17.9% |
+| Fri 6 Nov | 7 days | 2.91 | 2.42 | +16.9% |
+| Sat 7 Nov | 8 days | 2.76 | 2.53 | +8.5% |
 
-("Same time last week" still falls back to "same as now": there is no week-old data yet.)
+**By hour of the forecast target**, all test days together (MAE in bikes, LightGBM without the night rule)
 
-By hour of day, LightGBM beats "same as now" in every hour from 06:00 to 23:00 (largest gain at 18:00: 3.77 vs 4.13 bikes) and is slightly worse at 00:00 and 02:00–05:00, which is what the night rule covers.
+| hours | same as now | LightGBM | gain |
+|---|---|---|---|
+| 02–05 (night) | 0.61–0.98 | 0.67–0.98 | −1% to −8% (night rule uses "same as now") |
+| 07 | 4.35 | 3.13 | +28% |
+| 08 | 4.95 | 3.78 | +24% |
+| 12 | 2.87 | 2.62 | +9% |
+| 17 | 4.44 | 3.76 | +15% |
+| 18 | 4.60 | 3.87 | +16% |
 
-Warnings, one hour ahead:
+Every hour from 06:00 to 01:00 is better than "same as now"; only 02:00–05:00 is worse, which is what the night rule covers.
+
+**Warnings one hour ahead**, averaged over the 7 test days
 
 | | empty: caught | empty: alarm right | full: caught | full: alarm right |
 |---|---|---|---|---|
-| same as now | 63% | 63% | 59% | 59% |
-| LightGBM count forecast | 50% | 70% | 40% | 77% |
-| **warning models** (AUC 0.91 empty, 0.95 full) | **75%** | 58% | **64%** | 55% |
+| same as now | 64% | 64% | 53% | 54% |
+| LightGBM count forecast | 59% | 69% | 37% | 76% |
+| **warning models** (AUC 0.91 empty, 0.95 full) | **78%** | 60% | **61%** | 52% |
 
-What this says:
-- Only LightGBM beats the naive baseline; linear regression and random forest do not. The forecast-of-change approach plus neighbours and recent trend is what helps.
-- Methods that ignore the current count (yesterday, historical average) are far worse one hour ahead. The current count carries most of the information.
-- The gain over the baseline is modest (about 5%) but consistent across the day, and largest at rush hours, which is when riders need it.
+The thresholds chosen on the training period were stable across folds (0.25–0.35 for empty, 0.20–0.30 for full), and the AUC stayed between 0.905 and 0.914 (empty) and 0.942 and 0.955 (full).
 
-### First fair test (1 Nov 2026): trained on Friday 30 Oct, tested on all of Saturday 31 Oct
+**What this says**
 
-474,000 test forecasts. The model never saw a weekend before this test.
+- LightGBM beats the naive baseline on every one of the 7 test days, by 12% on average.
+- The gain grows with more training data: about 5% with 2–3 days, about 17% with 5–7 days. Saturday 7 Nov (+8.5%) is lower; at that point the model had seen only one earlier Saturday.
+- The gain is largest at rush hours (+28% at 07:00, +16% at 18:00), which is when riders most need a forecast.
+- Random forest also beats the baseline (+6%), linear regression does not. The current count plus non-linear effects of trend, neighbours and time of day is what helps.
+- Methods that ignore the current count (yesterday, last week, historical average) are far worse one hour ahead.
+- The warning models catch more stations that really run empty (78% vs 64%) and full (61% vs 53%), with slightly more false alarms. For a rider, a missed warning costs more than a false one, so the website uses them.
 
-| method | MAE (bikes) | within 2 bikes | NTU score | vs "same as now" |
-|---|---|---|---|---|
-| same as now (baseline) | 2.74 | 64% | 0.169 | – |
-| same time yesterday | 5.65 | 39% | 0.338 | −106% |
-| linear regression | 2.96 | 49% | 0.198 | −8% |
-| random forest | 2.79 | 53% | 0.189 | −2% |
-| LightGBM | 2.64 | 58% | 0.170 | +3.7% |
-| **LightGBM + night rule** | **2.62** | 59% | **0.168** | **+4.5%** |
+### Earlier checks
 
-("Same time last week" and "historical average" fall back to "same as now" here: there is no week-old data yet, and the training day had no weekend.)
+Before the final run, the same validation was run on shorter periods (train Fri → test Sat 31 Oct: +4.5%; train Fri–Sat → test Sun 1 Nov: +4.9%), and the forecasts published on the website were checked against what really happened:
 
-Warnings (did we warn about stations that really ran empty / full one hour later?):
-
-| | empty: caught | empty: alarm right | full: caught | full: alarm right |
-|---|---|---|---|---|
-| same as now | 63% | 62% | 55% | 56% |
-| LightGBM count forecast | 50% | 68% | 32% | 78% |
-| **warning models** (AUC 0.90 empty, 0.94 full) | **80%** | 53% | **57%** | 51% |
-
-The warning models catch far more stations that run empty, at the cost of more false alarms. For a rider, a missed warning (walking to an empty station) costs more than a false one, so the website uses them.
-
-### Live check of the published forecasts (31 Oct 07:50 – 1 Nov 03:30)
+**Live check of the published forecasts (31 Oct 07:50 – 1 Nov 03:30)**
 
 Every forecast the website showed, compared with the real count one hour later (389,000 forecasts, model trained on Friday only):
 - the website's "now" and "1 hour ago" matched the saved official data in 100% of cases;
 - MAE 2.78 vs 2.90 for "same as now" (4% better); for stations that really changed by 3+ bikes, 5.41 vs 6.21 (13% better);
 - better than "same as now" in every hour from 07:00 to 23:00, slightly worse from 00:00 to 04:00, which led to the night rule.
-
-The final validation, with one fold per day over the full collection period, is planned for 8 Nov 2026.
