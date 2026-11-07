@@ -2,6 +2,19 @@
 
 This describes how the raw snapshots become the tables used for modelling, what each column means, and the known problems in the data.
 
+## In numbers
+
+| | |
+|---|---|
+| collection | 30 Oct 2026 02:49 to 8 Nov 2026 01:20 (Taipei time), every 10 minutes |
+| analysis period | 30 Oct 02:50 to 7 Nov 23:50: 9 days, 1,279 ten-minute slots, of which 5 are missing (0.4%) |
+| stations | 3,446 (1,824 Taipei, 1,622 New Taipei) |
+| station readings | 4,381,591, of which 98.5% pass every quality check |
+| fetches | every snapshot of the three sources succeeded; no unreadable files |
+| weather | 20,409 observations at 24 points; it barely rained (at most 0.7 mm in 15 minutes) |
+
+The 80 minutes collected on 8 Nov are kept in `data/raw/` but left out of the tables, so the analysis covers whole days only (`ANALYSIS_END` in `pipeline/build_dataset.py`; `--end none` keeps everything).
+
 ## Rebuilding from scratch
 
 ```bash

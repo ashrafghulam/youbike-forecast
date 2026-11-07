@@ -8,7 +8,8 @@ Two static pages published with GitHub Pages, no server: `docs/index.html` (map)
 - Each station is a bike pin when zoomed in, a dot when zoomed out. Colour = what to expect in one hour: green (bikes available, 6+), orange (only a few, 3–5), red (no bikes, ≤ 2), blue (no parking, ≤ 2 free docks).
 - Find a station three ways: an area dropdown (all 42 districts), a search box with suggestions while typing (English or Chinese, e.g. "MRT exit 5", "台大"), or "Near me" (browser location).
 - A summary for the chosen area ("In 1 hour: 516 stations with no bikes…"); clicking a line highlights only those stations.
-- Click a pin: pop-up with 1 hour ago / now / in 1 hour, a plain-language verdict and a link to the station page. Optional 3D view and dark mode.
+- Click a pin: a station card (beside the map, so pins never cover it) with 1 hour ago / now / in 1 hour, a plain-language verdict and a link to the station page, which opens in a new tab. Optional 3D view and dark mode.
+- When the data is more than an hour old (after collection ended on 8 Nov 2026), the header says so and shows the time of the last forecast instead of looking live.
 
 **Station page** (`station.html?id=<station number>`, shareable)
 - Verdict, 1 hour ago / now / in 1 hour, a chart of the last 2 hours with the forecast, "Why this forecast?" in plain sentences, and the 6 nearest stations with a small map.
@@ -53,5 +54,5 @@ Because live forecasting uses the same code as training, a feature can't be comp
 ## Limits
 
 - Live data depends on three public APIs. If one fails, the app says which one in the header, and shows what it could get.
-- In the first week, "same time last week" has no data, so that feature is empty.
+- The app needs the collector to be running: it downloads the last 2 hours, yesterday and last week from the collector's history. After collection stopped (8 Nov 2026), the live forecast has no recent trend or yesterday data and is weaker. Turning the collector back on for a demo (Actions tab -> collect -> Enable workflow, then Run workflow) fixes this after about 2 hours.
 - The forecast is only as good as the latest collected snapshot: if the collector has a gap, the trend features are weaker.

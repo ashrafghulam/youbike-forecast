@@ -23,6 +23,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 from pathlib import Path
 
@@ -87,7 +88,7 @@ def is_night(df: pd.DataFrame) -> np.ndarray:
 def train_model(train: pd.DataFrame) -> lgb.Booster:
     # The model predicts the change from now; the forecast is bikes_now + change.
     ds = lgb.Dataset(train[FEATURES], label=train["y"] - train["bikes_now"],
-                     categorical_feature=CATEGORICAL, free_raw_data=False)
+                     categorical_feature=CATEGORICAL)
     return lgb.train(PARAMS, ds, num_boost_round=NUM_ROUNDS)
 
 
@@ -122,7 +123,7 @@ def historical_average(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
 
 
 def _fit_alert(train: pd.DataFrame, label: np.ndarray) -> lgb.Booster:
-    ds = lgb.Dataset(train[FEATURES], label=label.astype(int), categorical_feature=CATEGORICAL, free_raw_data=False)
+    ds = lgb.Dataset(train[FEATURES], label=label.astype(int), categorical_feature=CATEGORICAL)
     return lgb.train(ALERT_PARAMS, ds, num_boost_round=ALERT_ROUNDS)
 
 
@@ -235,7 +236,10 @@ def cross_validate(df: pd.DataFrame, min_train_days: int):
         h = test.assign(hour=test["target_hour"].astype(int), err_model=np.abs(lgbm - test["y"]),
                         err_persist=np.abs(test["bikes_now"] - test["y"]))
         hourly.append(h[["hour", "err_model", "err_persist"]])
-        print(f"  {test_day}: train {len(train):,} rows ({len(train['date'].unique())} days), test {len(test):,} rows")
+        print(f"  {test_day}: train {len(train):,} rows ({len(train['date'].unique())} days), test {len(test):,} rows",
+              flush=True)
+        del model, alerts, probs, preds, train, test, h      # keep memory flat as the training set grows
+        gc.collect()
 
     folds = pd.DataFrame(rows)
     by_hour = (pd.concat(hourly).groupby("hour")[["err_model", "err_persist"]].mean()
@@ -268,6 +272,7 @@ def main():
     args.models.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_parquet(args.features)
+    df["station_id"] = df["station_id"].astype("category")   # saves memory; not a model input
     if not args.no_cv:
         print("validation (one fold per test day):")
         folds, by_hour, aucs = cross_validate(df, args.min_train_days)
