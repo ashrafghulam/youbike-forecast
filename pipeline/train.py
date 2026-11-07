@@ -192,9 +192,15 @@ def metrics(test: pd.DataFrame, pred: np.ndarray, alerts=None) -> dict:
 
 # ------------------------------------------------------------------ validation
 
+def usable_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows with a known target and a current count. No copy if nothing is dropped."""
+    keep = df["y"].notna() & df["bikes_now"].notna()
+    return df if keep.all() else df[keep]
+
+
 def cross_validate(df: pd.DataFrame, min_train_days: int):
-    df = df[df["y"].notna() & df["bikes_now"].notna()].copy()
-    df["target_time"] = df["slot"] + pd.Timedelta(minutes=60)
+    df = usable_rows(df)
+    target_time = df["slot"] + pd.Timedelta(minutes=60)
     days = sorted(df["date"].unique())
     if len(days) <= min_train_days:
         raise SystemExit(f"need more than {min_train_days} days of data, have {len(days)}")
@@ -202,7 +208,7 @@ def cross_validate(df: pd.DataFrame, min_train_days: int):
     rows, hourly, aucs = [], [], []
     for test_day in days[min_train_days:]:
         test_start = pd.Timestamp(test_day).tz_localize(df["slot"].dt.tz)
-        train = df[df["target_time"] < test_start]                 # purge: target must be before test day
+        train = df[target_time < test_start]                       # purge: target must be before test day
         test = df[df["date"] == test_day]
         if train.empty or test["slot"].nunique() < MIN_TEST_SLOTS:
             print(f"  {test_day}: skipped (only {test['slot'].nunique()} time slots, need {MIN_TEST_SLOTS})")
@@ -278,6 +284,8 @@ def main():
     df["station_id"] = df["station_id"].astype("category")
     wide = [c for c in NUMERIC if df[c].dtype in ("float64", "int64")]
     df[wide] = df[wide].astype("float32")
+    df = df[df["y"].notna() & df["bikes_now"].notna()].reset_index(drop=True)   # one copy, shared below
+    gc.collect()
     if not args.no_cv:
         print("validation (one fold per test day):")
         folds, by_hour, aucs = cross_validate(df, args.min_train_days)
@@ -293,7 +301,7 @@ def main():
 
     gc.collect()
     # final models on everything, for the website, the app and the driver analysis
-    full = df[df["y"].notna() & df["bikes_now"].notna()]
+    full = usable_rows(df)
     model = train_model(full)
     model.save_model(str(args.models / "lgbm.txt"))
     alerts = train_alerts(full)
