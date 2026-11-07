@@ -171,6 +171,46 @@ The thresholds chosen on the training period were stable across folds (0.25–0.
 - Methods that ignore the current count (yesterday, last week, historical average) are far worse one hour ahead.
 - The warning models catch more stations that really run empty (78% vs 64%) and full (61% vs 53%), with slightly more false alarms. For a rider, a missed warning costs more than a false one, so the website uses them.
 
+### Drivers (final model, trained on all 9 days)
+
+`python pipeline/drivers.py`, on 30,000 random rows. Numbers are the average size of each group's contribution to the forecast, in bikes (mean |SHAP|).
+
+| what the model uses | effect (bikes) | strongest single inputs |
+|---|---|---|
+| current state | 0.85 | bikes now, how full the station is |
+| yesterday / last week | 0.70 | how this station changed in the same hour yesterday; bikes at the target time yesterday |
+| time of day / weekday | 0.26 | target hour, day of week |
+| neighbouring stations | 0.25 | how full nearby stations are, and how they changed in the last 30 min |
+| recent trend | 0.18 | change over the last 10 / 30 / 60 min |
+| location | 0.10 | district |
+| weather | 0.06 | mostly temperature (which also tracks the time of day) |
+
+- The **current count** matters most, and the **daily routine** is next: the most useful single input after the count is how the same station changed in the same hour yesterday. "Same time yesterday" alone is a poor forecast (MAE 5.18), but as a correction to the current count it carries a lot of information.
+- **Time of day**: on weekdays the model expects stations to lose the most bikes for targets around 07:00–09:00 (on average −0.67 bikes per station at 08:00, against −0.40 at weekends), with a second, smaller dip in the evening (`figures/pd_hour.png`).
+- **Neighbours**: if nearby stations lost 30% of their fill in the last 30 minutes, the expected change is −0.76 bikes; if they stayed level, −0.21 (`figures/pd_neighbours.png`). People go to the next station when theirs runs out, and stations around one MRT exit or office block empty together.
+- **Weather** has almost no effect, because there was almost no rain during collection (at most 0.7 mm in 15 minutes). The rain curve (`figures/pd_rain.png`) is flat above 0.5 mm, because the model never saw heavier rain. This is a limit of the data, not evidence that rain doesn't matter.
+
+### What-if scenarios
+
+Every station at a real weekday evening moment, Fri 6 Nov 17:30, forecasting 18:30 (3,399 stations). One input is changed, everything else stays real. Base: 579 stations expected to be nearly empty (≤ 2 bikes).
+
+| scenario | what changes | stations nearly empty | avg change per station | stations moving > 2 bikes |
+|---|---|---|---|---|
+| base | real conditions | 579 | – | – |
+| neighbours emptying fast | nearby stations lost 15% more of their bikes in the last 30 min | **668 (+89)** | −0.44 | 37 |
+| same moment on a Saturday | weekday → Saturday | **504 (−75)** | +0.13 (average size 0.70) | 243 |
+| heavy rain next hour | 5 mm/h forecast (90%), raining 2 mm now | 533 (−46) | +0.13 | 84 |
+| station draining | this station lost 4 more bikes in 30 min | 582 (+3) | −0.19 | 9 |
+| 6 °C warmer | temperature now and next hour +6 °C | 567 (−12) | 0.00 | 1 |
+| dry next hour | no rain now or forecast | 581 (+2) | 0.00 | 0 |
+
+- **Neighbours emptying** is the strongest scenario: about 90 more stations would be nearly empty. A practical use: when one area starts to drain, warn about the stations around it, not only the one already empty.
+- **Saturday instead of Friday** changes the most stations (243 move by more than 2 bikes), but in both directions (average size of the change 0.70 bikes, average change only +0.13), so some stations gain and others lose.
+- **Heavy rain** shows fewer empty stations (fewer people ride), but the model only saw light rain, so this number should not be trusted. More data in the rainy season is needed.
+- A station's **own recent drain** moves the forecast less than expected (−0.19 bikes for 4 bikes lost). The model gives more weight to the daily routine and the neighbours than to the last 30 minutes at one station.
+
+Limits: this explains what the model learned from 9 days of autumn data, not proven cause and effect, and changing one input alone can create combinations that rarely happen.
+
 ### Earlier checks
 
 Before the final run, the same validation was run on shorter periods (train Fri → test Sat 31 Oct: +4.5%; train Fri–Sat → test Sun 1 Nov: +4.9%), and the forecasts published on the website were checked against what really happened:

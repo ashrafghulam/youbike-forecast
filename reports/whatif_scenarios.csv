@@ -1,0 +1,8 @@
+moment,scenario,what changes,avg change vs base (bikes),avg size of change (bikes),stations near empty,stations moving > 2 bikes
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),base,real conditions at this time,0.0,0.0,579,0
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),heavy rain next hour,"forecast 5 mm/h (90%), already raining 2 mm",0.1296847289293187,0.3839588131285791,533,84
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),dry next hour,no rain now or forecast,0.002310672726917965,0.018529241452530234,581,0
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),same moment on a Saturday,"weekday -> Saturday, everything else equal",0.130930980173459,0.6978216061684334,504,243
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),neighbours emptying fast,nearby stations lost 15% more of their bikes in the last 30 min,-0.43609732993345085,0.445716968511079,668,37
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),station draining,this station lost 4 more bikes in 30 min (6 in 60 min),-0.19031647725306247,0.33835282515166926,582,9
+Fri 06 Nov 17:30 -> forecast for +1 h (3399 stations),hot evening,6 °C warmer now and next hour,-0.0026828755490716904,0.12704103200931058,567,1

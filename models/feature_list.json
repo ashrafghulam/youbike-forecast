@@ -94,6 +94,6 @@
   "low": 2,
   "alert_thresholds": {
     "empty": 0.3,
-    "full": 0.3
+    "full": 0.25
   }
 }

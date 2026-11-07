@@ -1,0 +1,36 @@
+name,mean_abs_shap,level
+current state,0.8497298570022596,group
+yesterday / last week,0.6999758910082038,group
+time of day / weekday,0.2585018685176844,group
+neighbouring stations,0.2456879332508994,group
+recent trend,0.18423283610231841,group
+location,0.10342261040483561,group
+weather,0.06158873754001105,group
+bikes_now,0.5546153879081722,feature
+chg_yday_next_hour,0.4535041192671921,feature
+bikes_yday_target,0.3550306018183754,feature
+fill_now,0.27168071481559836,feature
+target_hour,0.21600397919348788,feature
+nbr_fill_now,0.16573288731899863,feature
+nbr_chg_30m,0.15088882108565754,feature
+dow,0.10260258103966033,feature
+docks_now,0.09816353122825626,feature
+district_en,0.0891018071525663,feature
+bikes_week_target,0.08563115989963938,feature
+chg_10m,0.07872083241959235,feature
+chg_30m,0.0782238212966052,feature
+chg_60m,0.0746354732176962,feature
+fc_temp_1h,0.033087798588714926,feature
+capacity,0.032398896994288155,feature
+fc_precip_prob_1h,0.020371586638919022,feature
+humidity_now,0.01454890005635905,feature
+temp_now,0.013200956619128656,feature
+wind_now,0.011337996306989258,feature
+is_weekend,0.010608636210810327,feature
+lat,0.009348176315520063,feature
+lon,0.0055091341387706015,feature
+fc_precip_1h,0.00382113712884829,feature
+city,0.002557284269639928,feature
+nbr_count,0.0016601642169135464,feature
+precip_now,0.000502320659242699,feature
+is_holiday,0.0,feature
