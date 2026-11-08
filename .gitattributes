@@ -1,3 +1,8 @@
 # Keep model files byte-for-byte (LightGBM cannot read Windows line endings)
 models/** -text
 *.json.gz binary
+
+# count the map website (served from docs/) as code in the language bar
+docs/*.html linguist-documentation=false
+docs/*.css  linguist-documentation=false
+docs/*.js   linguist-documentation=false
