@@ -2,6 +2,8 @@
 
 Predict how many bikes a Taipei / New Taipei YouBike station will have one hour from now, and explain what drives it.
 
+**Map website:** [ashrafghulam.github.io/youbike-forecast](https://ashrafghulam.github.io/youbike-forecast/) (every station with its 1-hour forecast; shows the last forecast made before collection ended on 8 Nov 2026)
+
 ## Results in short
 
 - **Data:** 9 days (30 Oct – 7 Nov 2026), every 10 minutes, 3,446 stations in Taipei and New Taipei plus weather at 24 points. 4.4 million station readings, 0.4% of time slots missing, no failed fetches. Collected by GitHub Actions; collection stopped on 8 Nov 2026 01:20.
