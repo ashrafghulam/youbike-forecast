@@ -2,7 +2,10 @@
 
 Predict how many bikes a Taipei / New Taipei YouBike station will have one hour from now, and explain what drives it.
 
-**Map website:** [ashrafghulam.github.io/youbike-forecast](https://ashrafghulam.github.io/youbike-forecast/) (every station with its 1-hour forecast; shows the last forecast made before collection ended on 8 Nov 2026)
+**Map website (riders):** [ashrafghulam.github.io/youbike-forecast](https://ashrafghulam.github.io/youbike-forecast/)  
+**Analysis app (operators):** [youbike-forecast.streamlit.app](https://youbike-forecast.streamlit.app)
+
+Data collection ended on 8 Nov 2026, so the map shows the last forecast made.
 
 ## Results in short
 
